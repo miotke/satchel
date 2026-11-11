@@ -39,6 +39,7 @@ Drag an item to the spot you want, then Alt+right-click it and choose **Pin to t
 | `/satchel reagent` | Show or hide the reagent bag (shown by default) |
 | `/satchel keyring` | Show or hide the keyring (hidden by default; the keyring button still shows it) |
 | `/satchel new <name>` | Make a category |
+| `/satchel perf` | Memory use and how long the last redraw took |
 | `/satchel reset` | Move the windows back to their default spots |
 
 ## Develop

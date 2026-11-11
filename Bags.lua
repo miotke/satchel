@@ -102,13 +102,6 @@ ns.On("PLAYER_LOGIN", function()
 		sectionKeys = { "bags", "reagent", "keyring" },
 		sections = Sections,
 		sort = C_Container.SortBags,
-		-- Blizzard clears new-item flags when its bag window closes. Before Satchel, items
-		-- may have piled up flags that window never cleared, so drop them all once.
-		onShow = function()
-			if ns.db.clearedNewItems then return end
-			ns.db.clearedNewItems = true
-			if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end
-		end,
 		onHide = function()
 			if peekKeyring then peekKeyring = false; backpack.dirty = true end
 			if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end
@@ -116,6 +109,19 @@ ns.On("PLAYER_LOGIN", function()
 	})
 	ns.backpack = backpack
 	HideBlizzardBags()
+
+	-- The client flags every carried item as new when it loads the bags at login and on
+	-- /reload. Only items that arrive after that are new, so drop those flags then, and once
+	-- more a moment later, since the bags can finish loading after the world appears.
+	ns.On("PLAYER_ENTERING_WORLD", function(isLogin, isReload)
+		if not (isLogin or isReload) or not (C_NewItems and C_NewItems.ClearAll) then return end
+		C_NewItems.ClearAll()
+		C_Timer.After(2, function()
+			C_NewItems.ClearAll()
+			ns.RefreshAll()
+		end)
+		ns.RefreshAll()
+	end)
 	HookBagFunctions()
 end)
 
@@ -142,6 +148,11 @@ SlashCmdList.SATCHEL = function(input)
 		ns.Print("keyring " .. (db.showKeyring and "shown" or "hidden"))
 	elseif command == "new" and value then
 		if ns.Categories.Create(value) then ns.Print("added category " .. strtrim(value)) end
+	elseif command == "perf" then
+		UpdateAddOnMemoryUsage()
+		local stats = ns.stats
+		ns.Print(format("%.0f KB memory, %d slot frames, last layout %.2f ms (%d so far)",
+			GetAddOnMemoryUsage("Satchel"), stats.slotFrames, stats.lastLayoutMs, stats.layouts))
 	elseif command == "reset" then
 		for _, window in ipairs(ns.windows) do
 			db[window.config.positionKey] = nil
@@ -151,6 +162,6 @@ SlashCmdList.SATCHEL = function(input)
 		backpack:SetShown(not backpack:IsShown())
 	else
 		ns.Print("/satchel, /satchel cols <6-30>, /satchel bankcols <6-30>, /satchel scale <0.5-2>, "
-			.. "/satchel reagent, /satchel keyring, /satchel new <category>, /satchel reset")
+			.. "/satchel reagent, /satchel keyring, /satchel new <category>, /satchel perf, /satchel reset")
 	end
 end

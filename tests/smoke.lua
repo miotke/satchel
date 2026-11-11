@@ -20,7 +20,7 @@ local function obj(name)
     if k == "GetFrameLevel" then return function() return 1 end end
     if k == "CreateTexture" or k == "CreateFontString" then return function() return obj() end end
     if k == "GetPoint" then return function() return "CENTER", nil, "CENTER", 1, 2 end end
-    if k == "Inset" or k == "CloseButton" or k == "ItemContextOverlay" then
+    if k == "Inset" or k == "CloseButton" or k == "ItemContextOverlay" or k == "NewItemTexture" or k == "BattlepayItemTexture" then
       local c = rawget(t, "_children"); c = c or {}; rawset(t, "_children", c); c[k] = c[k] or obj(); return c[k]
     end
     return function() end
@@ -34,11 +34,14 @@ Enum = { BagIndex = { ReagentBag = 5, Keyring = -2, CharacterBankTab_1 = 6, Char
 function ToggleKeyRing() end
 slots = { [0]=16, 18, 18, 18, 18, 36, [-2]=12, [6]=28, [7]=0, [8]=20 }
 items = {}  -- "bag:slot" -> itemID
+infoCalls = 0
+clock = 0; debugprofilestop = function() clock = clock + 1; return clock end
+UpdateAddOnMemoryUsage = function() end; GetAddOnMemoryUsage = function() return 512 end; format = string.format
 C_Container = {
   GetContainerNumSlots = function(b) return slots[b] or 0 end,
   GetContainerNumFreeSlots = function(b) return 3 end,
   GetContainerItemID = function(b, s) return items[b..":"..s] end,
-  GetContainerItemInfo = function(b, s) local id = items[b..":"..s]; if id then return { iconFileID = 1, stackCount = 1, quality = 3, hyperlink = "x" } end end,
+  GetContainerItemInfo = function(b, s) infoCalls = infoCalls + 1; local id = items[b..":"..s]; if id then return { iconFileID = 1, stackCount = 1, quality = 3, hyperlink = "x" } end end,
   GetContainerItemQuestInfo = function() return { isQuestItem = false } end,
   SetItemSearch = function() end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
 }
@@ -74,16 +77,20 @@ OKAY, CANCEL, DELETE, BANK = "Okay", "Cancel", "Delete", "Bank"
 local ns = {}
 for _, f in ipairs{"Core","Categories","Window","Bags","Bank"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
 local events = frames[2]  -- frames[1] is ns.hidden
-local function fire(e, ...) events._scripts.OnEvent(events, e, ...) end
 local function flush() local t = timers; timers = {}; for _, f in ipairs(t) do f() end end
+local function fire(e, ...) events._scripts.OnEvent(events, e, ...); flush() end
 fire("ADDON_LOADED", "Satchel"); fire("PLAYER_LOGIN")
+-- login and /reload drop the flags the client sets while loading the bags, now and 2 s later
+fire("PLAYER_ENTERING_WORLD", false, true); assert(newCleared == 2, "reload clears " .. newCleared)
+fire("PLAYER_ENTERING_WORLD", false, false); assert(newCleared == 2, "zoning keeps new items")
+newCleared = 0
 local bag, bankw = ns.backpack, ns.bank
 assert(BankFrame._scripts.OnEvent == nil)
 
 -- open
 hooks.OpenBackpack(); hooks.ToggleAllBags(); flush(); assert(bag:IsShown())
-assert(newCleared == 1 and ns.db.clearedNewItems, "first open clears new flags")
-bag:SetShown(false); assert(newCleared == 2); bag:SetShown(true); assert(newCleared == 2, "only once on show")
+assert(newCleared == 0, "opening alone clears nothing")
+bag:SetShown(false); assert(newCleared == 1, "closing clears, like Blizzard"); bag:SetShown(true)
 local function headers(w) local t = {}; for _, h in ipairs(w.headers) do if h:IsShown() then t[#t+1] = h.text:GetText() end end; return table.concat(t, ",") end
 assert(headers(bag) == "", "no headers without categories")
 local h0 = bag.frame._h
@@ -167,6 +174,25 @@ local b = bag.buttons[1][7]; altDown = true; b._hooks.OnClick(b, "RightButton");
 find(menus[#menus], "Unpin").a(); assert(bag:Pins()[333] == nil and not b.decoration.satchelPin:IsShown())
 -- the bank has its own pins
 assert(next(bankw:Pins()) == nil)
+
+-- performance: a cooldown reads no item info; a burst of events is one layout
+infoCalls = 0; fire("BAG_UPDATE_COOLDOWN"); assert(infoCalls == 0, "cooldown read item info " .. infoCalls)
+local layouts = ns.stats.layouts
+events._scripts.OnEvent(events, "BAG_UPDATE_DELAYED"); events._scripts.OnEvent(events, "BAG_CONTAINER_UPDATE")
+events._scripts.OnEvent(events, "BAG_UPDATE_COOLDOWN"); events._scripts.OnEvent(events, "INVENTORY_SEARCH_UPDATE")
+flush(); assert(ns.stats.layouts == layouts + 1, "burst made " .. (ns.stats.layouts - layouts) .. " layouts")
+-- hidden windows do no work, then draw once when shown
+bag:SetShown(false); layouts = ns.stats.layouts; infoCalls = 0
+fire("BAG_UPDATE_DELAYED"); fire("BAG_UPDATE_COOLDOWN"); fire("INVENTORY_SEARCH_UPDATE")
+assert(infoCalls == 0 and ns.stats.layouts == layouts, "hidden window worked")
+bag:SetShown(true); assert(ns.stats.layouts == layouts + 1)
+-- empty slots skip the quest lookup
+local questCalls = 0; local q = C_Container.GetContainerItemQuestInfo
+C_Container.GetContainerItemQuestInfo = function(...) questCalls = questCalls + 1; return q(...) end
+fire("INVENTORY_SEARCH_UPDATE"); C_Container.GetContainerItemQuestInfo = q
+local filled = 0; for _ in pairs(items) do filled = filled + 1 end
+assert(questCalls <= filled, "quest lookups " .. questCalls)
+SlashCmdList.SATCHEL("perf")
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)

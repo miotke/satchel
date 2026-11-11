@@ -22,13 +22,20 @@ function Categories.Key(id)
 	return "category:" .. id
 end
 
+-- itemID -> category id, so a layout looks each slot up once instead of scanning every
+-- category. Rebuilt on the next lookup after any change.
+local itemIndex
+
 -- The id of the category holding itemID, or nil.
 function Categories.Of(itemID)
 	if not itemID then return nil end
-	for _, category in ipairs(ns.db.categories) do
-		if category.items[itemID] then return category.id end
+	if not itemIndex then
+		itemIndex = {}
+		for _, category in ipairs(ns.db.categories) do
+			for id in pairs(category.items) do itemIndex[id] = category.id end
+		end
 	end
-	return nil
+	return itemIndex[itemID]
 end
 
 -- Puts itemID in the category with id, or in none when id is nil.
@@ -36,6 +43,7 @@ function Categories.Assign(itemID, id)
 	for _, category in ipairs(ns.db.categories) do category.items[itemID] = nil end
 	local category = id and Categories.Get(id)
 	if category then category.items[itemID] = true end
+	itemIndex = nil
 	ns.RefreshAll()
 end
 
@@ -73,6 +81,7 @@ function Categories.Delete(id)
 	for index, category in ipairs(ns.db.categories) do
 		if category.id == id then table.remove(ns.db.categories, index) break end
 	end
+	itemIndex = nil
 	ns.RefreshAll()
 end
 

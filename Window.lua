@@ -99,6 +99,9 @@ function Window:Button(bag, slot)
 	decoration:SetAllPoints(button)
 	if button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
 	if button.ItemContextOverlay then button.ItemContextOverlay:SetAlpha(0) end
+	-- The decoration draws the new-item glow; the click layer's own would sit on top of it.
+	if button.NewItemTexture then button.NewItemTexture:Hide() end
+	if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
 	button:HookScript("OnClick", OnItemClick)
 
 	button.decoration = decoration
@@ -128,6 +131,7 @@ function Window:UpdateButton(button)
 	local texture = info and info.iconFileID
 	if button.SetHasItem then button:SetHasItem(texture) end
 
+	visual.satchelTexture = texture
 	SetItemButtonTexture(visual, texture)
 	SetItemButtonCount(visual, info and info.stackCount or 0)
 	SetItemButtonDesaturated(visual, info and info.isLocked)
@@ -136,8 +140,12 @@ function Window:UpdateButton(button)
 	if visual.UpdateNewItem then visual:UpdateNewItem(info and info.quality) end
 	if visual.UpdateJunkItem then visual:UpdateJunkItem(info and info.quality, info and info.hasNoValue) end
 	if visual.UpdateQuestItem then
-		local quest = C_Container.GetContainerItemQuestInfo(bag, slot)
-		visual:UpdateQuestItem(quest.isQuestItem, quest.questID, quest.isActive)
+		if info then
+			local quest = C_Container.GetContainerItemQuestInfo(bag, slot)
+			visual:UpdateQuestItem(quest.isQuestItem, quest.questID, quest.isActive)
+		else
+			visual:UpdateQuestItem(false)
+		end
 	end
 	if visual.SetMatchesSearch then visual:SetMatchesSearch(not (info and info.isFiltered)) end
 	if visual.SetReadable then visual:SetReadable(info and info.isReadable) end
@@ -350,6 +358,7 @@ function Window:Groups()
 end
 
 function Window:Layout()
+	local start = debugprofilestop and debugprofilestop()
 	local columns = ns.db[self.config.columnsKey]
 	local step = SLOT_SIZE + SPACING
 	local width = columns * step - SPACING
@@ -397,6 +406,12 @@ function Window:Layout()
 	self.frame:SetSize(width + PADDING * 2 + 10, height + PADDING * 2 + INSET_TOP + INSET_BOTTOM)
 	self:UpdateFooter()
 	self.dirty = false
+	if start then
+		local stats = ns.stats
+		stats.layouts = stats.layouts + 1
+		stats.lastLayoutMs = debugprofilestop() - start
+		stats.slotFrames = buttonCount * 2
+	end
 end
 
 function Window:UpdateAll()
@@ -405,6 +420,49 @@ function Window:UpdateAll()
 			if button:IsShown() then self:UpdateButton(button) end
 		end
 	end
+end
+
+-- Cooldowns change far more often than anything else (BAG_UPDATE_COOLDOWN fires on many
+-- casts), so they skip reading item info: each slot keeps the icon it last drew.
+function Window:UpdateCooldowns()
+	for _, slots in pairs(self.buttons) do
+		for _, button in pairs(slots) do
+			local visual = button.decoration
+			if visual.satchelTexture and button:IsShown() and visual.UpdateCooldown then
+				visual:UpdateCooldown(visual.satchelTexture)
+			end
+		end
+	end
+end
+
+local WORK = { cooldowns = 1, update = 2, layout = 3 }
+
+-- Events often come several to a frame (looting fires a few), so a window does the largest
+-- piece of work they asked for once, on the next frame. Hidden windows only remember that
+-- a layout is due; showing draws everything anyway.
+function Window:Schedule(work)
+	if not self.frame:IsShown() then
+		if work == "layout" then self.dirty = true end
+		return
+	end
+	if self.pending then
+		if WORK[work] > WORK[self.pending] then self.pending = work end
+		return
+	end
+	self.pending = work
+	C_Timer.After(0, function()
+		local pending = self.pending
+		self.pending = nil
+		if not self.frame:IsShown() then
+			if pending == "layout" then self.dirty = true end
+		elseif pending == "layout" then
+			self:Layout()
+		elseif pending == "update" then
+			self:UpdateAll()
+		else
+			self:UpdateCooldowns()
+		end
+	end)
 end
 
 function Window:UpdateSlot(bag, slot)
@@ -530,17 +588,25 @@ local function EachShown(method, ...)
 	end
 end
 
+local function ScheduleAll(work)
+	return function()
+		for _, window in ipairs(ns.windows) do window:Schedule(work) end
+	end
+end
+
 ns.On("PLAYER_LOGIN", function()
-	ns.On("BAG_UPDATE_DELAYED", ns.RefreshAll)
-	ns.On("BAG_CONTAINER_UPDATE", ns.RefreshAll)
+	ns.On("BAG_UPDATE_DELAYED", ScheduleAll("layout"))
+	ns.On("BAG_CONTAINER_UPDATE", ScheduleAll("layout"))
 	ns.On("ITEM_LOCK_CHANGED", function(bag, slot)
 		if slot then EachShown("UpdateSlot", bag, slot) end
 	end)
 	ns.On("PLAYER_MONEY", function() EachShown("UpdateFooter") end)
-	for _, event in ipairs({ "BAG_UPDATE_COOLDOWN", "INVENTORY_SEARCH_UPDATE", "BAG_NEW_ITEMS_UPDATED", "QUEST_ACCEPTED" }) do
-		ns.On(event, function() EachShown("UpdateAll") end)
+	ns.On("BAG_UPDATE_COOLDOWN", ScheduleAll("cooldowns"))
+	for _, event in ipairs({ "INVENTORY_SEARCH_UPDATE", "BAG_NEW_ITEMS_UPDATED", "QUEST_ACCEPTED" }) do
+		ns.On(event, ScheduleAll("update"))
 	end
+	local updateAll = ScheduleAll("update")
 	ns.On("UNIT_QUEST_LOG_CHANGED", function(unit)
-		if unit == "player" then EachShown("UpdateAll") end
+		if unit == "player" then updateAll() end
 	end)
 end)
