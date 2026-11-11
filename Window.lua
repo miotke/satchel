@@ -1,5 +1,6 @@
--- A bag window: the backpack and the bank are both one of these. Player categories come
--- first, each under its header, then the window's own sections (bags, reagents, keyring).
+-- A bag window: the backpack and the bank are both one of these. It shows the player's
+-- categories and its own sections (bags, reagents, keyring), each under a header, in an
+-- order the player sets per window.
 
 local _, ns = ...
 
@@ -21,7 +22,9 @@ local buttonCount = 0
 	positionKey   db key for the saved position
 	defaultPoint  { point, relativePoint, x, y }
 	columnsKey    db key for slots per row
-	sections      function returning { { label, bags = { bagIDs }, notFree = bool }, ... }
+	orderKey      db.order key for this window's section order
+	sectionKeys   every section key this window can show, in default order
+	sections      function returning { { key, label, bags = { bagIDs }, notFree = bool }, ... }
 	sort          function, or nil for no Sort button
 	close         function for the close button, or nil to just hide
 	onShow        function run before the window draws, or nil
@@ -123,12 +126,89 @@ function Window:UpdateButton(button)
 	if visual.SetReadable then visual:SetReadable(info and info.isReadable) end
 end
 
+local function IndexOf(list, value)
+	for index, entry in ipairs(list) do
+		if entry == value then return index end
+	end
+	return nil
+end
+
+-- The window's order of category and section keys, kept in step with the categories that
+-- exist: deleted ones drop out, new ones go on top, and sections never seen go last.
+function Window:Order()
+	local order = ns.db.order[self.config.orderKey] or {}
+	ns.db.order[self.config.orderKey] = order
+	local valid, present = {}, {}
+	for _, category in ipairs(ns.Categories.List()) do valid[ns.Categories.Key(category.id)] = true end
+	for _, key in ipairs(self.config.sectionKeys) do valid[key] = true end
+	for index = #order, 1, -1 do
+		local key = order[index]
+		if not valid[key] or present[key] then table.remove(order, index) else present[key] = true end
+	end
+	local top = 1
+	for _, category in ipairs(ns.Categories.List()) do
+		local key = ns.Categories.Key(category.id)
+		if not present[key] then
+			table.insert(order, top, key)
+			top = top + 1
+		end
+	end
+	for _, key in ipairs(self.config.sectionKeys) do
+		if not present[key] then table.insert(order, key) end
+	end
+	return order
+end
+
+-- The entry key moves past its neighbour among what the window shows, so hidden entries
+-- (empty categories, a switched-off keyring) never swallow a move. An entry that is not
+-- showing moves past its neighbour in the full order.
+function Window:Neighbor(key, offset)
+	local shown = self.shownKeys or {}
+	local index = IndexOf(shown, key)
+	if index then return shown[index + offset] end
+	local order = self:Order()
+	index = IndexOf(order, key)
+	return index and order[index + offset]
+end
+
+function Window:CanMove(key, offset)
+	return self:Neighbor(key, offset) ~= nil
+end
+
+function Window:Move(key, offset)
+	local neighbor = self:Neighbor(key, offset)
+	if not neighbor then return end
+	local order = self:Order()
+	table.remove(order, IndexOf(order, key))
+	local index = IndexOf(order, neighbor)
+	table.insert(order, offset > 0 and index + 1 or index, key)
+	self.dirty = true
+	self:Refresh()
+end
+
 -- Dropping an item on a category's header puts it there; on a section's header, takes it out.
 local function OnHeaderDrop(header)
 	local kind, itemID = GetCursorInfo()
 	if kind ~= "item" then return end
 	ClearCursor()
 	ns.Categories.Assign(itemID, header.category)
+end
+
+local function ShowHeaderMenu(header)
+	if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+	local window, key, id = header.window, header.key, header.category
+	MenuUtil.CreateContextMenu(header, function(_, root)
+		root:CreateTitle(header.text:GetText())
+		ns.Categories.AddMoveButtons(root, window, key)
+		if id then
+			root:CreateButton("Rename…", function() ns.Categories.PromptRename(id) end)
+			root:CreateButton("Delete…", function() ns.Categories.ConfirmDelete(id) end)
+		end
+	end)
+end
+
+local function OnHeaderClick(header, mouse)
+	if mouse == "RightButton" then ShowHeaderMenu(header) else OnHeaderDrop(header) end
 end
 
 local function OnHeaderEnter(header)
@@ -139,6 +219,7 @@ local function OnHeaderEnter(header)
 	else
 		GameTooltip:AddLine("Drop an item here to take it out of its category.", 1, 1, 1, true)
 	end
+	GameTooltip:AddLine("Right-click to move this section.", 0.8, 0.8, 0.8, true)
 	GameTooltip:Show()
 end
 
@@ -149,8 +230,10 @@ function Window:Header(index)
 	header:SetHeight(HEADER_HEIGHT - 2)
 	header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	header.text:SetPoint("LEFT")
+	header.window = self
+	header:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	header:SetScript("OnReceiveDrag", OnHeaderDrop)
-	header:SetScript("OnClick", OnHeaderDrop)
+	header:SetScript("OnClick", OnHeaderClick)
 	header:SetScript("OnEnter", OnHeaderEnter)
 	header:SetScript("OnLeave", GameTooltip_Hide)
 	self.headers[index] = header
@@ -171,39 +254,39 @@ function Window:UpdateFooter()
 	self.moneyText:SetText(GetMoneyString(GetMoney(), true))
 end
 
--- Sorts every slot into groups: categories in their order, then the window's sections. Empty
--- slots stay in their section.
+-- Sorts every slot into groups, in the window's order: an item in a category goes to that
+-- category's group, everything else (empty slots too) to its section's.
 function Window:Groups()
-	local categorized, sections, used = {}, {}, {}
-	for index, section in ipairs(self.config.sections()) do
+	local byKey, used = {}, {}
+	for _, category in ipairs(ns.Categories.List()) do
+		byKey[ns.Categories.Key(category.id)] = { label = category.name, category = category.id, buttons = {} }
+	end
+	for _, section in ipairs(self.config.sections()) do
 		local group = { label = section.label, buttons = {} }
-		sections[index] = group
+		byKey[section.key] = group
 		for _, bag in ipairs(section.bags) do
 			local slots = C_Container.GetContainerNumSlots(bag)
 			used[bag] = slots
 			for slot = 1, slots do
 				local button = self:Button(bag, slot)
-				local category = ns.Categories.Of(C_Container.GetContainerItemID(bag, slot))
-				if category then
-					categorized[category] = categorized[category] or {}
-					table.insert(categorized[category], button)
-				else
-					table.insert(group.buttons, button)
-				end
+				local id = ns.Categories.Of(C_Container.GetContainerItemID(bag, slot))
+				local target = id and byKey[ns.Categories.Key(id)] or group
+				table.insert(target.buttons, button)
 			end
 		end
 	end
 
-	local groups = {}
-	for index, category in ipairs(ns.Categories.List()) do
-		if categorized[index] then
-			groups[#groups + 1] = { label = category.name, category = index, buttons = categorized[index] }
+	local groups, shownKeys, hasCategories = {}, {}, false
+	for _, key in ipairs(self:Order()) do
+		local group = byKey[key]
+		if group and #group.buttons > 0 then
+			group.key = key
+			groups[#groups + 1] = group
+			shownKeys[#shownKeys + 1] = key
+			hasCategories = hasCategories or group.category ~= nil
 		end
 	end
-	local hasCategories = #groups > 0
-	for _, group in ipairs(sections) do
-		if #group.buttons > 0 then groups[#groups + 1] = group end
-	end
+	self.shownKeys = shownKeys
 	return groups, used, hasCategories
 end
 
@@ -225,6 +308,7 @@ function Window:Layout()
 			header:SetWidth(width)
 			header.text:SetText(group.label)
 			header.category = group.category
+			header.key = group.key
 			header:Show()
 			y = y + HEADER_HEIGHT
 		end
@@ -284,10 +368,10 @@ function Window:RestorePosition()
 	self.frame:SetPoint(p[1], UIParent, p[2], p[3], p[4])
 end
 
-local function ShowOptionsMenu(owner)
-	MenuUtil.CreateContextMenu(owner, function(_, root)
+local function ShowOptionsMenu(gear)
+	MenuUtil.CreateContextMenu(gear, function(_, root)
 		ns.AddOptionsMenu(root)
-		ns.Categories.AddManageMenu(root)
+		ns.Categories.AddManageMenu(root, gear.window)
 	end)
 end
 
@@ -332,6 +416,7 @@ function Window:Build()
 		gear:SetPoint("TOPRIGHT", right, -28)
 		gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
 		gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+		gear.window = self
 		gear:SetScript("OnClick", ShowOptionsMenu)
 		right = right - 24
 	end

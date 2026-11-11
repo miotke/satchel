@@ -105,22 +105,35 @@ items["3:1"] = nil; fire("BAG_UPDATE_DELAYED"); assert(headers(bag) == "", heade
 -- drop on header assigns
 items["3:1"] = 111; fire("BAG_UPDATE_DELAYED")
 cursor = 222; bag.headers[1]._scripts.OnReceiveDrag(bag.headers[1]); assert(cursor == nil and ns.Categories.Of(222) == 1)
+-- move Tanking below Bags from the header's right-click menu, then back up from the gear menu
+bag.headers[1]._scripts.OnClick(bag.headers[1], "RightButton")
+local hm = menus[#menus]; assert(not find(hm, "Move up") and find(hm, "Move down") and find(hm, "Rename…"))
+find(hm, "Move down").a(); assert(headers(bag) == "Bags,Tanking,Reagents", headers(bag))
+assert(bag.buttons[0][2]._points[1][5] == -18, "bags first now")
+-- a hidden keyring never swallows a move: Tanking moves past Reagents, then can't go further
+bag:Move("category:1", 1); assert(headers(bag) == "Bags,Reagents,Tanking", headers(bag))
+assert(not bag:CanMove("category:1", 1))
+bag:Move("category:1", -1); bag:Move("category:1", -1); assert(headers(bag) == "Tanking,Bags,Reagents", headers(bag))
+-- the bank keeps its own order
+assert(ns.db.order.bank == nil or ns.db.order.bank[1] ~= "bags")
 -- drop on Bags header removes
 cursor = 222; bag.headers[2]._scripts.OnReceiveDrag(bag.headers[2]); assert(ns.Categories.Of(222) == nil)
 -- duplicate name refused, rename, move, delete
 assert(ns.Categories.Create("tanking") == nil)
 assert(ns.Categories.Create("Healing") == 2)
-ns.Categories.Move(2, -1); assert(ns.db.categories[1].name == "Healing")
-local g = {} ; MenuUtil.CreateContextMenu(nil, function(_, root) ns.AddOptionsMenu(root); ns.Categories.AddManageMenu(root) end)
+assert(bag:Order()[1] == "category:2", "new category goes on top")
+local g = {} ; MenuUtil.CreateContextMenu(nil, function(_, root) ns.AddOptionsMenu(root); ns.Categories.AddManageMenu(root, bag) end)
 local manage = find(menus[#menus], "Categories"); assert(find(manage, "Tanking") and find(find(manage, "Tanking"), "Delete…"))
-ns.Categories.Delete(2); assert(#ns.db.categories == 1 and headers(bag) == "", headers(bag))
+ns.Categories.Delete(1); assert(#ns.db.categories == 1 and headers(bag) == "", headers(bag))
+fire("BAG_UPDATE_DELAYED"); assert(ns.db.order.backpack[1] == "category:2" and #ns.db.order.backpack == 4, "deleted key dropped")
 
 -- bank
 fire("BANKFRAME_OPENED"); assert(bankw:IsShown() and BankPanel:IsShown())
 local n = 0; for b, s in pairs(bankw.buttons) do for _, x in pairs(s) do if x:IsShown() then n = n + 1; assert(x.decoration:IsShown()) end end end
 assert(n == 48, "bank slots " .. n)
 assert(bankw.freeText:GetText() == "6/48 free", bankw.freeText:GetText())
-items["8:3"] = 111; ns.Categories.Assign(111, 1); assert(headers(bankw) == "Healing,Bank", headers(bankw))
+items["8:3"] = 111; ns.Categories.Assign(111, 2); assert(headers(bankw) == "Healing,Bank", headers(bankw))
+bankw:Move("bank", -1); assert(headers(bankw) == "Bank,Healing", headers(bankw))
 bankw.frame.CloseButton._scripts.OnClick(); assert(bankClosed)
 fire("BANKFRAME_CLOSED"); assert(not bankw:IsShown() and not BankPanel:IsShown())
 -- escape path
@@ -128,7 +141,7 @@ fire("BANKFRAME_OPENED"); bankClosed = false; hooks.CloseSpecialWindows(); asser
 fire("BANKFRAME_CLOSED"); bankClosed = false; hooks.CloseSpecialWindows(); assert(not bankClosed, "no close away from bank")
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
-SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering")
+SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)
 SlashCmdList.SATCHEL("reset"); SlashCmdList.SATCHEL("keyring"); SlashCmdList.SATCHEL("help")
 -- The clickable button must carry no add-on-written fields Blizzard's click reads.
 for _, w in ipairs(ns.windows) do for _, slots in pairs(w.buttons) do for _, b in pairs(slots) do

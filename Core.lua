@@ -46,6 +46,16 @@ ns.On("ADDON_LOADED", function(name)
 	for key, value in pairs(DEFAULTS) do
 		if ns.db[key] == nil then ns.db[key] = value end
 	end
-	-- { { name = "Tanking", items = { [itemID] = true } }, ... }, in display order.
+	-- { { id = 1, name = "Tanking", items = { [itemID] = true } }, ... }
 	ns.db.categories = ns.db.categories or {}
+	-- Categories made before they had ids get one; the order per window refers to them by it.
+	ns.db.nextCategoryID = ns.db.nextCategoryID or 1
+	for _, category in ipairs(ns.db.categories) do
+		if not category.id then
+			category.id = ns.db.nextCategoryID
+			ns.db.nextCategoryID = category.id + 1
+		end
+	end
+	-- { backpack = { "category:1", "bags", "reagent", "keyring" }, bank = { ... } }
+	ns.db.order = ns.db.order or {}
 end)

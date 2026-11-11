@@ -10,13 +10,13 @@ local function Sections()
 	local db = ns.db
 	local bags = {}
 	for bag = 0, NUM_BAG_SLOTS or 4 do bags[#bags + 1] = bag end
-	local sections = { { label = "Bags", bags = bags } }
+	local sections = { { key = "bags", label = "Bags", bags = bags } }
 	if ns.REAGENT and db.showReagent and C_Container.GetContainerNumSlots(ns.REAGENT) > 0 then
-		sections[#sections + 1] = { label = "Reagents", bags = { ns.REAGENT } }
+		sections[#sections + 1] = { key = "reagent", label = "Reagents", bags = { ns.REAGENT } }
 	end
 	-- Keyring slots hold only keys, so they are not free space.
 	if ns.KEYRING and (db.showKeyring or peekKeyring) and C_Container.GetContainerNumSlots(ns.KEYRING) > 0 then
-		sections[#sections + 1] = { label = "Keyring", bags = { ns.KEYRING }, notFree = true }
+		sections[#sections + 1] = { key = "keyring", label = "Keyring", bags = { ns.KEYRING }, notFree = true }
 	end
 	return sections
 end
@@ -98,6 +98,8 @@ ns.On("PLAYER_LOGIN", function()
 		positionKey = "position",
 		defaultPoint = { "BOTTOMRIGHT", "BOTTOMRIGHT", -80, 120 },
 		columnsKey = "columns",
+		orderKey = "backpack",
+		sectionKeys = { "bags", "reagent", "keyring" },
 		sections = Sections,
 		sort = C_Container.SortBags,
 		-- Blizzard clears new-item flags when its bag window closes. Before Satchel, items

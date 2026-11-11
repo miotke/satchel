@@ -12,12 +12,13 @@ Open your bags as usual (B, the bag bar, vendors). The bank window opens when yo
 
 ### Categories
 
-Make your own categories, like "Tanking", and put items in them. A category is a section at the top of the backpack and bank. It shows only while one of its items is there, and everything else stays in the unified grid.
+Make your own categories, like "Tanking", and put items in them. A category is a section of the backpack and bank, at the top until you move it. It shows only while one of its items is there, and everything else stays in the unified grid.
 
 - **Alt+right-click** an item to pick its category, make a new one, or take it out.
 - **Drag** an item onto a category's header to add it, or onto the Bags header to take it out.
 - Items belong to a category by item ID, so an item goes back to its category whenever it returns to your bags, for example after you unequip it.
-- Rename, reorder and delete categories in the gear menu under Categories.
+- **Right-click** any header to move that section up or down. Categories, Bags, Reagents and Keyring can go in any order, and the backpack and bank each keep their own.
+- Rename, move and delete categories in the gear menu under Categories, too.
 
 ### Commands
 

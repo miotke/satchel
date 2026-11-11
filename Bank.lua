@@ -23,7 +23,7 @@ local function BankBags()
 end
 
 local function Sections()
-	return { { label = "Bank", bags = BankBags() } }
+	return { { key = "bank", label = "Bank", bags = BankBags() } }
 end
 
 local function CloseBank()
@@ -60,6 +60,8 @@ ns.On("PLAYER_LOGIN", function()
 		positionKey = "bankPosition",
 		defaultPoint = { "TOPLEFT", "TOPLEFT", 40, -120 },
 		columnsKey = "bankColumns",
+		orderKey = "bank",
+		sectionKeys = { "bank" },
 		sections = Sections,
 		sort = (C_Container.SortBankBags or C_Container.SortBank) and Sort or nil,
 		close = CloseBank,
