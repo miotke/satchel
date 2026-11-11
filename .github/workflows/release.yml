@@ -16,13 +16,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Built from source fetched from GitHub; the runner's Ubuntu mirrors can be unreachable.
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "luajit-2.1.0-beta3"
       - name: Smoke test
-        run: |
-          for attempt in 1 2 3; do
-            sudo apt-get update -q && sudo apt-get install -y -q luajit && break
-            sleep 10
-          done
-          luajit tests/smoke.lua .
+        run: lua tests/smoke.lua .
       - uses: BigWigsMods/packager@v2
         env:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
