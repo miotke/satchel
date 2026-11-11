@@ -1,6 +1,6 @@
 # Satchel
 
-## Unreleased
+## v0.3.0
 
 - **Bank tabs.** The bank window has a row of bank tabs. Drop a bag on a tab to add its slots, drag it off to take it out, and buy the next tab from the plus.
 - **Masque support.** Skin the Backpack and Bank groups from Masque's options.
