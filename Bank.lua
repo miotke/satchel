@@ -10,6 +10,7 @@
 local _, ns = ...
 
 local bank
+local bagsOpenedByBank = false
 ns.atBank = false
 
 function ns.BankBags()
@@ -107,12 +108,18 @@ ns.On("PLAYER_LOGIN", function()
 		end
 		bank:SetShown(true)
 		ns.UpdateBankTabs()
+		-- Like Blizzard's bank, open the bags beside it, and close them again with it only if
+		-- the bank opened them.
+		bagsOpenedByBank = not ns.backpack:IsShown()
+		ns.backpack:SetShown(true)
 	end)
 
 	ns.On("BANKFRAME_CLOSED", function()
 		if ns.atBank then ns.SaveBankCopy() end
 		ns.atBank = false
 		bank:SetShown(false)
+		if bagsOpenedByBank then ns.backpack:SetShown(false) end
+		bagsOpenedByBank = false
 		if BankPanel then BankPanel:Hide() end
 		SilenceMoneyDisplay()
 	end)

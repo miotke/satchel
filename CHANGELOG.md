@@ -1,5 +1,9 @@
 # Satchel
 
+## Unreleased
+
+- Talking to a banker opens your bags too, and closes them again when you leave if they weren't already open.
+
 ## v0.3.1
 
 - **Your bank, anywhere.** Satchel saves a copy of your bank each time you visit a banker. Open it from the bag button next to Sort, or `/satchel bank`, to see and search your bank from anywhere.
