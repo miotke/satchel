@@ -24,6 +24,8 @@ local buttonCount = 0
 	sections      function returning { { label, bags = { bagIDs }, notFree = bool }, ... }
 	sort          function, or nil for no Sort button
 	close         function for the close button, or nil to just hide
+	onShow        function run before the window draws, or nil
+	onHide        function run after the window hides, or nil
 ]]
 function ns.CreateWindow(config)
 	local self = setmetatable({ config = config, holders = {}, buttons = {}, headers = {}, dirty = true }, Window)
@@ -362,6 +364,7 @@ function Window:Build()
 
 	frame:SetScript("OnShow", function()
 		PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
+		if self.config.onShow then self.config.onShow() end
 		if self.dirty then self:Layout() else self:UpdateAll(); self:UpdateFooter() end
 	end)
 	frame:SetScript("OnHide", function()

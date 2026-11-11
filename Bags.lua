@@ -100,6 +100,13 @@ ns.On("PLAYER_LOGIN", function()
 		columnsKey = "columns",
 		sections = Sections,
 		sort = C_Container.SortBags,
+		-- Blizzard clears new-item flags when its bag window closes. Before Satchel, items
+		-- may have piled up flags that window never cleared, so drop them all once.
+		onShow = function()
+			if ns.db.clearedNewItems then return end
+			ns.db.clearedNewItems = true
+			if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end
+		end,
 		onHide = function()
 			if peekKeyring then peekKeyring = false; backpack.dirty = true end
 			if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end

@@ -40,6 +40,7 @@ C_Container = {
   GetContainerItemQuestInfo = function() return { isQuestItem = false } end,
   SetItemSearch = function() end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
 }
+newCleared = 0; C_NewItems = { ClearAll = function() newCleared = newCleared + 1 end }
 C_Item = { GetItemNameByID = function() return "Shield" end }
 local timers = {}
 C_Timer = { After = function(_, f) timers[#timers+1] = f end }
@@ -79,6 +80,8 @@ assert(BankFrame._scripts.OnEvent == nil)
 
 -- open
 hooks.OpenBackpack(); hooks.ToggleAllBags(); flush(); assert(bag:IsShown())
+assert(newCleared == 1 and ns.db.clearedNewItems, "first open clears new flags")
+bag:SetShown(false); assert(newCleared == 2); bag:SetShown(true); assert(newCleared == 2, "only once on show")
 local function headers(w) local t = {}; for _, h in ipairs(w.headers) do if h:IsShown() then t[#t+1] = h.text:GetText() end end; return table.concat(t, ",") end
 assert(headers(bag) == "", "no headers without categories")
 local h0 = bag.frame._h
