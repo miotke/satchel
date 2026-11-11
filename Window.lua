@@ -12,6 +12,10 @@ local EMPTY_SLOT_ATLAS = "bags-item-slot64"
 local PIN_ATLAS = "Waypoint-MapPin-ChatIcon"
 local NEW_ITEM_ATLAS = "bags-glow-white"
 
+-- Masque, when installed, skins the decoration only: the click layer must carry no add-on
+-- writes (Window:Button), and Masque stores its state on the buttons it skins.
+local Masque = LibStub and LibStub("Masque", true)
+
 local Window = {}
 Window.__index = Window
 ns.windows = {}
@@ -29,11 +33,14 @@ local buttonCount = 0
 	sections      function returning { { key, label, bags = { bagIDs }, notFree = bool }, ... }
 	sort          function, or nil for no Sort button
 	close         function for the close button, or nil to just hide
+	bottomExtra   extra height above the footer for a window's own bar (the bank's tabs), or nil
+	masqueGroup   Masque group name for this window's slots
 	onShow        function run before the window draws, or nil
 	onHide        function run after the window hides, or nil
 ]]
 function ns.CreateWindow(config)
 	local self = setmetatable({ config = config, holders = {}, buttons = {}, headers = {}, dirty = true }, Window)
+	if Masque and config.masqueGroup then self.masque = Masque:Group("Satchel", config.masqueGroup) end
 	self:Build()
 	table.insert(ns.windows, self)
 	return self
@@ -130,6 +137,7 @@ function Window:Button(bag, slot)
 	button:HookScript("OnEnter", OnItemEnter)
 
 	button.decoration = decoration
+	if self.masque then self.masque:AddButton(decoration) end
 	button.satchelBag, button.satchelSlot = bag, slot
 	self.buttons[bag][slot] = button
 	return button
@@ -496,13 +504,21 @@ function Window:Layout()
 
 	local height = math.max(y, SLOT_SIZE)
 	self.content:SetSize(width, height)
-	self.frame:SetSize(width + PADDING * 2 + 10, height + PADDING * 2 + INSET_TOP + INSET_BOTTOM)
+	local bottom = INSET_BOTTOM + (self.config.bottomExtra or 0)
+	self.frame:SetSize(width + PADDING * 2 + 10, height + PADDING * 2 + INSET_TOP + bottom)
+	self:ReSkin()
 	self:UpdateFooter()
 	self.dirty = false
 	if start then
 		ns.stats.slotFrames = buttonCount * 2
 		ns.RecordWork("layout", self.config.orderKey, debugprofilestop() - start, placed)
 	end
+end
+
+-- Drawing re-applies Blizzard's quality border over a Masque skin, so the whole group is
+-- skinned again after a pass, once, rather than per slot.
+function Window:ReSkin()
+	if self.masque then self.masque:ReSkin() end
 end
 
 function Window:UpdateAll()
@@ -515,6 +531,7 @@ function Window:UpdateAll()
 			end
 		end
 	end
+	self:ReSkin()
 	if start then ns.RecordWork("update", self.config.orderKey, debugprofilestop() - start, count) end
 end
 
@@ -621,7 +638,7 @@ function Window:Build()
 
 	frame.Inset:ClearAllPoints()
 	frame.Inset:SetPoint("TOPLEFT", 4, -INSET_TOP)
-	frame.Inset:SetPoint("BOTTOMRIGHT", -6, INSET_BOTTOM)
+	frame.Inset:SetPoint("BOTTOMRIGHT", -6, INSET_BOTTOM + (config.bottomExtra or 0))
 
 	self.content = CreateFrame("Frame", nil, frame)
 	self.content:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", PADDING, -PADDING)

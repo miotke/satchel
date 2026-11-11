@@ -2,5 +2,10 @@ package-as: Satchel
 
 ignore:
   - tests
-  - tools
   - .gitignore
+
+# Release notes come from this file, not the commit list; Reload and other add-on
+# managers show them as the changelog.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

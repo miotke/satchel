@@ -102,6 +102,7 @@ ns.On("PLAYER_LOGIN", function()
 		defaultPoint = { "BOTTOMRIGHT", "BOTTOMRIGHT", -80, 120 },
 		columnsKey = "columns",
 		orderKey = "backpack",
+		masqueGroup = "Backpack",
 		sectionKeys = { "bags", "reagent", "keyring" },
 		sections = Sections,
 		sort = C_Container.SortBags,

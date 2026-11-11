@@ -65,8 +65,11 @@ ns.On("PLAYER_LOGIN", function()
 		sections = Sections,
 		sort = (C_Container.SortBankBags or C_Container.SortBank) and Sort or nil,
 		close = CloseBank,
+		masqueGroup = "Bank",
+		bottomExtra = ns.BankTabsSupported() and ns.BANK_TABS_HEIGHT or nil,
 	})
 	ns.bank = bank
+	ns.CreateBankTabs(bank)
 	HideBlizzardBank()
 
 	-- Escape hides the window through UISpecialFrames; leave banking mode with it.
@@ -85,6 +88,7 @@ ns.On("PLAYER_LOGIN", function()
 			SilenceMoneyDisplay()
 		end
 		bank:SetShown(true)
+		ns.UpdateBankTabs()
 	end)
 
 	ns.On("BANKFRAME_CLOSED", function()
@@ -94,7 +98,15 @@ ns.On("PLAYER_LOGIN", function()
 		SilenceMoneyDisplay()
 	end)
 
-	for _, event in ipairs({ "PLAYERBANKSLOTS_CHANGED", "BANK_TABS_CHANGED" }) do
-		pcall(ns.On, event, function() bank:Refresh() end)
+	-- A tab bought, or a bag put in or taken out of a tab's socket.
+	for _, event in ipairs({ "PLAYERBANKSLOTS_CHANGED", "BANK_TABS_CHANGED", "BAG_CONTAINER_UPDATE" }) do
+		pcall(ns.On, event, function()
+			if not atBank then return end
+			bank:Refresh()
+			ns.UpdateBankTabs()
+		end)
 	end
+	ns.On("PLAYER_REGEN_ENABLED", function()
+		if atBank then ns.UpdateBankTabs() end
+	end)
 end)

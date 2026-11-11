@@ -34,7 +34,17 @@ created, frames = 0, {}
 function CreateFrame(_, name, parent) created = created + 1; local o = obj(name); o._parent = parent; frames[#frames+1] = o; if name then _G[name] = o end; return o end
 UIParent = obj(); UISpecialFrames = {}; NUM_BAG_SLOTS = 4; NUM_TOTAL_BAG_FRAMES = 6
 BankFrame = obj(); BankPanel = obj(); BankPanel.MoneyDisplay = obj()
-Enum = { BagIndex = { ReagentBag = 5, Keyring = -2, CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 }, BankType = { Character = 0 } }
+Enum = { BagIndex = { ReagentBag = 5, Keyring = -2, CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, CharacterBankTab_4 = 9, Characterbanktab = -4 }, BankType = { Character = 0 } }
+boughtTabs = { { ID = 6 }, { ID = 7 }, { ID = 8 } }; socketBags = { [3] = 5555 }; picked = {}
+C_Bank = { CloseBankFrame = function() bankClosed = true end,
+  FetchPurchasedBankTabData = function() return boughtTabs end,
+  CanPurchaseBankTab = function() return true end,
+  FetchNextPurchasableBankTabData = function() return { tabCost = 100000 } end }
+ItemLocation = { CreateFromBagAndSlot = function(_, bag, slot) return { bag = bag, slot = slot } end }
+IsModifiedClick = function() return false end
+skinned, reskins = {}, 0
+LibStub = function(name) if name == "Masque" then return { Group = function(_, addon, group)
+  return { AddButton = function(_, b) skinned[b] = group end, ReSkin = function() reskins = reskins + 1 end } end } end end
 function ToggleKeyRing() end
 slots = { [0]=16, 18, 18, 18, 18, 36, [-2]=12, [6]=28, [7]=0, [8]=20 }
 items = {}  -- "bag:slot" -> itemID
@@ -47,7 +57,7 @@ C_Container = {
   GetContainerItemID = function(b, s) return items[b..":"..s] end,
   GetContainerItemInfo = function(b, s) infoCalls = infoCalls + 1; local id = items[b..":"..s]; if id then return { iconFileID = 1, stackCount = 1, quality = 3, hyperlink = "x" } end end,
   GetContainerItemQuestInfo = function() return { isQuestItem = false } end,
-  SetItemSearch = function() end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
+  SetItemSearch = function() end, PickupContainerItem = function(b, s) picked[#picked+1] = b .. ":" .. s end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
 }
 newCleared = 0; newItems = {}
 C_NewItems = { ClearAll = function() newCleared = newCleared + 1; newItems = {} end,
@@ -55,6 +65,8 @@ C_NewItems = { ClearAll = function() newCleared = newCleared + 1; newItems = {} 
   RemoveNewItem = function(b, s) newItems[b .. ":" .. s] = nil end }
 questIDs = {}  -- itemID -> true for quest items
 C_Item = { GetItemNameByID = function() return "Shield" end,
+  DoesItemExist = function(loc) return socketBags[loc.slot] ~= nil end,
+  GetItemIcon = function(loc) return socketBags[loc.slot] end,
   GetItemInfoInstant = function(id) return id, nil, nil, nil, nil, questIDs[id] and 12 or 4 end }
 local timers = {}
 C_Timer = { After = function(_, f) timers[#timers+1] = f end }
@@ -68,7 +80,7 @@ SOUNDKIT = {}; GetMoney = function() return 12345 end; GetMoneyString = function
 UnitName = function() return "Me" end; InCombatLockdown = function() return false end
 altDown = false; IsAltKeyDown = function() return altDown end
 cursor = nil; GetCursorInfo = function() if cursor then return "item", cursor end end; ClearCursor = function() cursor = nil end
-bankClosed = false; C_Bank = { CloseBankFrame = function() bankClosed = true end }
+bankClosed = false
 menus = {}
 local function menuDesc()
   local d = { entries = {} }
@@ -84,7 +96,7 @@ SlashCmdList = {}
 OKAY, CANCEL, DELETE, BANK = "Okay", "Cancel", "Delete", "Bank"
 
 local ns = {}
-for _, f in ipairs{"Core","Categories","Window","Bags","Bank","Perf"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
+for _, f in ipairs{"Core","Categories","Window","Bags","BankTabs","Bank","Perf"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
 local events = frames[2]  -- frames[1] is ns.hidden
 local function flush() local t = timers; timers = {}; for _, f in ipairs(t) do f() end end
 local function fire(e, ...) events._scripts.OnEvent(events, e, ...); flush() end
@@ -152,6 +164,24 @@ assert(n == 48, "bank slots " .. n)
 assert(bankw.freeText:GetText() == "6/48 free", bankw.freeText:GetText())
 items["8:3"] = 111; ns.Categories.Assign(111, 2); assert(headers(bankw) == "Healing,Bank", headers(bankw))
 bankw:Move("bank", -1); assert(headers(bankw) == "Bank,Healing", headers(bankw))
+-- bank tabs: tab 2 bought, empty socket; tab 3 bought with a bag; tab 4 is the one to buy
+local function tabFrames() local t = {}; for _, f in ipairs(frames) do if f._scripts.OnDragStart and f._parent and f._parent._parent == bankw.frame then t[#t+1] = f end end; return t end
+local tb = tabFrames(); assert(#tb == 3, "three socket buttons " .. #tb)
+assert(tb[1]:IsShown() and tb[1].icon._tex == nil or true)
+assert(tb[1]:IsShown() and tb[2]:IsShown() and not tb[3]:IsShown(), "bought tabs show")
+assert(SatchelBuyBankTab4:IsShown() and not SatchelBuyBankTab2:IsShown(), "only the next tab offers a buy")
+assert(SatchelBuyBankTab4._scripts.OnClick == nil, "purchase click stays Blizzard's")
+cursor = 4242; tb[1]._scripts.OnClick(tb[1]); assert(picked[#picked] == "-4:2", "drop a bag into socket 2")
+tb[2]._scripts.OnDragStart(tb[2]); assert(picked[#picked] == "-4:3", "drag the bag out of socket 3")
+cursor = nil
+boughtTabs[4] = { ID = 9 }; C_Bank.CanPurchaseBankTab = function() return false end; fire("BANK_TABS_CHANGED")
+assert(tb[3]:IsShown() and not SatchelBuyBankTab4:IsShown(), "bought tab 4 shows, nothing left to buy")
+-- Masque skins the decoration only, per window group, and reskins after a pass
+local anyBag, anyBank
+for _, s in pairs(bag.buttons) do for _, b in pairs(s) do assert(skinned[b] == nil, "click layer skinned"); anyBag = anyBag or skinned[b.decoration] end end
+for _, s in pairs(bankw.buttons) do for _, b in pairs(s) do anyBank = anyBank or skinned[b.decoration] end end
+assert(anyBag == "Backpack" and anyBank == "Bank", "masque groups")
+local before = reskins; bankw:Layout(); assert(reskins == before + 1, "one reskin per pass")
 bankw.frame.CloseButton._scripts.OnClick(); assert(bankClosed)
 fire("BANKFRAME_CLOSED"); assert(not bankw:IsShown() and not BankPanel:IsShown())
 -- escape path

@@ -4,7 +4,7 @@ A unified bag window for World of Warcraft: Forever. The backpack and your four 
 
 ## Install
 
-Install it with an add-on manager that reads GitHub releases, or download the zip from [Releases](https://github.com/miotke/satchel/releases) and unzip it. For development, copy or symlink this folder into `World of Warcraft/_forever_/Interface/AddOns/Satchel`.
+Install it with an add-on manager that reads GitHub releases, or download the zip from [Releases](https://github.com/miotke/satchel/releases) and unzip it.
 
 ## Use
 
@@ -29,6 +29,17 @@ Drag an item to the spot you want, then Alt+right-click it and choose **Pin to t
 - If a section shrinks below the pin, the item shows in its last slot. If two pins want the same spot, the item that comes first in your bags gets it, and the other takes the next free one.
 - Only the first stack of a pinned item is pinned. The backpack and bank have their own pins.
 
+### Bank tabs
+
+Below the bank's slots is a row of bank tabs. Each tab after the first holds one bag.
+
+- **Drop a bag** on an empty tab, or click it while holding a bag, to add the bag's slots to your bank. **Drag** a bag off a tab to take it out, or drop another on it to swap.
+- The **plus** buys the next tab, through Blizzard's own purchase dialog. Hover it for the price.
+
+### Masque
+
+With [Masque](https://www.curseforge.com/wow/addons/masque) installed, pick a skin for Satchel's Backpack and Bank groups in Masque's options.
+
 ### Commands
 
 | Command | Does |
@@ -43,13 +54,3 @@ Drag an item to the spot you want, then Alt+right-click it and choose **Pin to t
 | `/satchel new <name>` | Make a category |
 | `/satchel perf` | Toggle a small window with memory, growth per second and redraw timings |
 | `/satchel reset` | Move the windows back to their default spots |
-
-## Develop
-
-Push a tag like `v0.2.1` to release: the Release workflow runs the smoke test, then the BigWigs packager publishes `Satchel-v0.2.1.zip` and `release.json` on GitHub.
-
-`luajit tests/smoke.lua .` runs the add-on headless against stubbed WoW APIs. It catches logic errors, not how anything looks in the game.
-
-## Not yet
-
-Bank bag sockets (buy a tab or swap a bank bag in Blizzard's bank for now), Masque skins.

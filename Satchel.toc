@@ -5,11 +5,13 @@
 ## Version: @project-version@
 ## Category: Inventory
 ## SavedVariables: SatchelDB
+## OptionalDeps: Masque
 ## IconTexture: Interface\Icons\inv_misc_bag_08
 
 Core.lua
 Categories.lua
 Window.lua
 Bags.lua
+BankTabs.lua
 Bank.lua
 Perf.lua
