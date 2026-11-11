@@ -67,9 +67,28 @@ local function OnItemClick(button, mouse)
 	if itemID then ns.Categories.ShowItemMenu(button, itemID, window, window.positions[button]) end
 end
 
--- Hovering an item tells the client it was seen, which clears its flag; redraw the slot then.
-local function OnItemLeave(button)
-	button:GetParent().window:UpdateButton(button)
+-- Hovering a new item marks it seen, which ends its glow.
+local function OnItemEnter(button)
+	local bag, slot = button.satchelBag, button.satchelSlot
+	if C_NewItems and C_NewItems.IsNewItem(bag, slot) then
+		C_NewItems.RemoveNewItem(bag, slot)
+		button:GetParent().window:UpdateButton(button)
+	end
+end
+
+-- Blizzard's new-item and Store ("battle pay") glows. Satchel draws its own new-item glow,
+-- and with Blizzard's handling bypassed these came back lit on every slot. Blizzard's code
+-- may Show them again, so they are shrunk to nothing rather than hidden.
+local function SilenceBlizzardGlows(button)
+	for _, key in ipairs({ "NewItemTexture", "BattlepayItemTexture" }) do
+		local texture = button[key]
+		if texture then
+			texture:Hide()
+			texture:ClearAllPoints()
+			texture:SetPoint("CENTER")
+			texture:SetSize(0.001, 0.001)
+		end
+	end
 end
 
 local function NewItemButton(name, holder, bag, slot)
@@ -94,6 +113,7 @@ function Window:Button(bag, slot)
 	local name = "SatchelItem" .. buttonCount
 	local decoration = NewItemButton(name .. "Decoration", holder, bag, slot)
 	decoration:EnableMouse(false)
+	SilenceBlizzardGlows(decoration)
 	local background = decoration:CreateTexture(nil, "BACKGROUND", nil, -6)
 	background:SetAllPoints()
 	if not background:SetAtlas(EMPTY_SLOT_ATLAS) then
@@ -105,11 +125,9 @@ function Window:Button(bag, slot)
 	decoration:SetAllPoints(button)
 	if button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
 	if button.ItemContextOverlay then button.ItemContextOverlay:SetAlpha(0) end
-	-- The decoration draws the new-item glow; the click layer's own would sit on top of it.
-	if button.NewItemTexture then button.NewItemTexture:Hide() end
-	if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
+	SilenceBlizzardGlows(button)
 	button:HookScript("OnClick", OnItemClick)
-	button:HookScript("OnLeave", OnItemLeave)
+	button:HookScript("OnEnter", OnItemEnter)
 
 	button.decoration = decoration
 	button.satchelBag, button.satchelSlot = bag, slot

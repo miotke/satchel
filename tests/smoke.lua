@@ -205,8 +205,12 @@ items["0:9"] = 777; newItems["0:9"] = true; fire("BAG_UPDATE_DELAYED")
 local nb = bag.buttons[0][9]
 assert(nb.decoration.satchelGlow:IsShown() and nb.decoration.satchelGlow.pulse:IsPlaying(), "new item glows")
 assert(not (bag.buttons[0][1].decoration.satchelGlow and bag.buttons[0][1].decoration.satchelGlow:IsShown()), "old item doesn't")
-C_NewItems.RemoveNewItem(0, 9); nb._hooks.OnLeave(nb)
-assert(not nb.decoration.satchelGlow:IsShown(), "hover clears glow")
+nb._hooks.OnEnter(nb)
+assert(not C_NewItems.IsNewItem(0, 9) and not nb.decoration.satchelGlow:IsShown(), "hover clears glow")
+-- Blizzard's own glows are shrunk away on both layers
+for _, layer in ipairs({ nb, nb.decoration }) do
+  assert(layer.BattlepayItemTexture._w == 0.001 and layer.NewItemTexture._w == 0.001, "blizzard glow left")
+end
 newItems["0:9"] = true; fire("BAG_UPDATE_DELAYED"); bag:SetShown(false); bag:SetShown(true)
 assert(not nb.decoration.satchelGlow:IsShown(), "closing the bag clears glow")
 
