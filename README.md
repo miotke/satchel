@@ -20,6 +20,14 @@ Make your own categories, like "Tanking", and put items in them. A category is a
 - **Right-click** any header to move that section up or down. Categories, Bags, Reagents and Keyring can go in any order, and the backpack and bank each keep their own.
 - Rename, move and delete categories in the gear menu under Categories, too.
 
+### Pinned slots
+
+Drag an item to the spot you want, then Alt+right-click it and choose **Pin to this slot**. It shows there from then on, with a pin mark, even after Sort or new loot moves it in your bags.
+
+- A pin is a position in its section counted from the top left, so bigger bags only add slots after it.
+- If a section shrinks below the pin, the item shows in its last slot. If two pins want the same spot, the item that comes first in your bags gets it, and the other takes the next free one.
+- Only the first stack of a pinned item is pinned. The backpack and bank have their own pins.
+
 ### Commands
 
 | Command | Does |

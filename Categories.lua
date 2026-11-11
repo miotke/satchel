@@ -139,8 +139,8 @@ function Categories.ConfirmDelete(id)
 	StaticPopup_Show("SATCHEL_DELETE_CATEGORY", Categories.Get(id).name, nil, { id = id })
 end
 
--- Alt+right-click on an item.
-function Categories.ShowItemMenu(owner, itemID)
+-- Alt+right-click on an item; position is where it shows in window, for pinning.
+function Categories.ShowItemMenu(owner, itemID, window, position)
 	if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
 	MenuUtil.CreateContextMenu(owner, function(_, root)
 		root:CreateTitle(C_Item.GetItemNameByID(itemID) or "Category")
@@ -152,6 +152,14 @@ function Categories.ShowItemMenu(owner, itemID)
 		root:CreateButton("New category…", function() Categories.PromptNew(itemID) end)
 		if Categories.Of(itemID) then
 			root:CreateButton("Remove from category", function() Categories.Assign(itemID, nil) end)
+		end
+		if window and position then
+			root:CreateDivider()
+			if window:Pins()[itemID] then
+				root:CreateButton("Unpin", function() window:Pin(itemID, nil) end)
+			else
+				root:CreateButton("Pin to this slot", function() window:Pin(itemID, position) end)
+			end
 		end
 	end)
 end

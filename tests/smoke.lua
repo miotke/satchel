@@ -2,6 +2,7 @@
 local function obj(name)
   local o = { _shown = false, _name = name, _scripts = {}, _hooks = {}, _points = {} }
   return setmetatable(o, { __index = function(t, k)
+    if type(k) == "string" and k:sub(1, 7) == "satchel" then return nil end
     if k == "IsShown" then return function(s) return s._shown end end
     if k == "Show" then return function(s) local was = s._shown; s._shown = true; if not was and s._scripts.OnShow then s._scripts.OnShow(s) end end end
     if k == "Hide" then return function(s) local was=s._shown; s._shown = false; if was and s._scripts.OnHide then s._scripts.OnHide(s) end end end
@@ -15,6 +16,7 @@ local function obj(name)
     if k == "GetText" then return function(s) return s._text or "" end end
     if k == "SetSize" then return function(s, w, h) s._w, s._h = w, h end end
     if k == "SetAtlas" then return function() return true end end
+    if k == "GetParent" then return function(s) return rawget(s, "_parent") end end
     if k == "GetFrameLevel" then return function() return 1 end end
     if k == "CreateTexture" or k == "CreateFontString" then return function() return obj() end end
     if k == "GetPoint" then return function() return "CENTER", nil, "CENTER", 1, 2 end end
@@ -25,7 +27,7 @@ local function obj(name)
   end })
 end
 created, frames = 0, {}
-function CreateFrame(_, name) created = created + 1; local o = obj(name); frames[#frames+1] = o; if name then _G[name] = o end; return o end
+function CreateFrame(_, name, parent) created = created + 1; local o = obj(name); o._parent = parent; frames[#frames+1] = o; if name then _G[name] = o end; return o end
 UIParent = obj(); UISpecialFrames = {}; NUM_BAG_SLOTS = 4; NUM_TOTAL_BAG_FRAMES = 6
 BankFrame = obj(); BankPanel = obj(); BankPanel.MoneyDisplay = obj()
 Enum = { BagIndex = { ReagentBag = 5, Keyring = -2, CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 }, BankType = { Character = 0 } }
@@ -59,7 +61,7 @@ menus = {}
 local function menuDesc()
   local d = { entries = {} }
   local function add(kind) return function(self, label, a, b) local e = menuDesc(); e.kind, e.label, e.a, e.b = kind, label, a, b; table.insert(self.entries, e); return e end end
-  d.CreateTitle = add("title"); d.CreateRadio = add("radio"); d.CreateButton = add("button"); d.CreateCheckbox = add("check")
+  d.CreateDivider = add("divider"); d.CreateTitle = add("title"); d.CreateRadio = add("radio"); d.CreateButton = add("button"); d.CreateCheckbox = add("check")
   return d
 end
 MenuUtil = { CreateContextMenu = function(owner, gen) local root = menuDesc(); gen(owner, root); menus[#menus+1] = root end }
@@ -139,6 +141,32 @@ fire("BANKFRAME_CLOSED"); assert(not bankw:IsShown() and not BankPanel:IsShown()
 -- escape path
 fire("BANKFRAME_OPENED"); bankClosed = false; hooks.CloseSpecialWindows(); assert(bankClosed)
 fire("BANKFRAME_CLOSED"); bankClosed = false; hooks.CloseSpecialWindows(); assert(not bankClosed, "no close away from bank")
+
+-- pins: item 333 sits at bag 4 slot 18 (position 88 of Bags); pin it to position 3
+for k in pairs(items) do items[k] = nil end
+items["4:18"] = 333; items["0:1"] = 444; fire("BAG_UPDATE_DELAYED")
+local b333 = bag.buttons[4][18]
+altDown = true; b333._hooks.OnClick(b333, "RightButton"); altDown = false
+local pm = menus[#menus]; assert(find(pm, "Pin to this slot") and not find(pm, "Unpin"))
+assert(bag.positions[b333] == 88, bag.positions[b333])
+bag:Pin(333, 3)
+assert(bag.positions[b333] == 3 and b333.decoration.satchelPin:IsShown(), "pinned to 3")
+assert(bag.positions[bag.buttons[0][1]] == 1 and bag.positions[bag.buttons[0][3]] == 4, "others flow around")
+-- the item moves physically (sort, unequip): it stays at position 3
+items["4:18"] = nil; items["1:7"] = 333; fire("BAG_UPDATE_DELAYED")
+assert(bag.positions[bag.buttons[1][7]] == 3 and bag.buttons[1][7].decoration.satchelPin:IsShown())
+assert(not b333.decoration.satchelPin:IsShown(), "old slot loses the mark")
+-- a second stack of the same item flows normally
+items["2:2"] = 333; fire("BAG_UPDATE_DELAYED"); assert(bag.positions[bag.buttons[1][7]] == 3 and bag.positions[bag.buttons[2][2]] ~= 3)
+-- clash: two items pinned to 3, second takes the next free
+items["0:5"] = 555; bag:Pin(555, 3); assert(bag.positions[bag.buttons[0][5]] == 3 and bag.positions[bag.buttons[1][7]] == 4, "first in bag order keeps the spot")
+-- out of range clamps to the end
+bag:Pin(555, 999); assert(bag.positions[bag.buttons[0][5]] == 88, bag.positions[bag.buttons[0][5]])
+-- unpin from the menu
+local b = bag.buttons[1][7]; altDown = true; b._hooks.OnClick(b, "RightButton"); altDown = false
+find(menus[#menus], "Unpin").a(); assert(bag:Pins()[333] == nil and not b.decoration.satchelPin:IsShown())
+-- the bank has its own pins
+assert(next(bankw:Pins()) == nil)
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)

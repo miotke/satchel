@@ -58,4 +58,6 @@ ns.On("ADDON_LOADED", function(name)
 	end
 	-- { backpack = { "category:1", "bags", "reagent", "keyring" }, bank = { ... } }
 	ns.db.order = ns.db.order or {}
+	-- { backpack = { [itemID] = position in its group }, bank = { ... } }
+	ns.db.pins = ns.db.pins or {}
 end)

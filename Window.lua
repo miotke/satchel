@@ -9,6 +9,7 @@ local INSET_TOP, INSET_BOTTOM, PADDING = 54, 28, 8
 local HEADER_HEIGHT = 18
 local SECTION_GAP = SPACING * 2
 local EMPTY_SLOT_ATLAS = "bags-item-slot64"
+local PIN_ATLAS = "Waypoint-MapPin-ChatIcon"
 
 local Window = {}
 Window.__index = Window
@@ -50,6 +51,7 @@ function Window:Holder(bag)
 		holder:SetAllPoints(self.content)
 		holder:SetID(bag)
 		holder.IsCombinedBagContainer = function() return false end
+		holder.window = self
 		self.holders[bag] = holder
 		self.buttons[bag] = {}
 	end
@@ -60,7 +62,8 @@ local function OnItemClick(button, mouse)
 	-- Alt+right-click does nothing in Blizzard's handler, which runs first.
 	if mouse ~= "RightButton" or not IsAltKeyDown() then return end
 	local itemID = C_Container.GetContainerItemID(button.satchelBag, button.satchelSlot)
-	if itemID then ns.Categories.ShowItemMenu(button, itemID) end
+	local window = button:GetParent().window
+	if itemID then ns.Categories.ShowItemMenu(button, itemID, window, window.positions[button]) end
 end
 
 local function NewItemButton(name, holder, bag, slot)
@@ -102,6 +105,20 @@ function Window:Button(bag, slot)
 	button.satchelBag, button.satchelSlot = bag, slot
 	self.buttons[bag][slot] = button
 	return button
+end
+
+-- The decoration's pin mark, made the first time a pinned item shows in its slot.
+local function SetPinned(button, pinned)
+	local decoration = button.decoration
+	if not pinned and not decoration.satchelPin then return end
+	if not decoration.satchelPin then
+		local mark = decoration:CreateTexture(nil, "OVERLAY", nil, 7)
+		mark:SetSize(14, 14)
+		mark:SetPoint("TOPRIGHT", 3, 3)
+		if not mark:SetAtlas(PIN_ATLAS) then mark:SetTexture("Interface\\COMMON\\Indicator-Yellow") end
+		decoration.satchelPin = mark
+	end
+	decoration.satchelPin:SetShown(pinned)
 end
 
 function Window:UpdateButton(button)
@@ -254,10 +271,49 @@ function Window:UpdateFooter()
 	self.moneyText:SetText(GetMoneyString(GetMoney(), true))
 end
 
+function Window:Pins()
+	local pins = ns.db.pins[self.config.orderKey] or {}
+	ns.db.pins[self.config.orderKey] = pins
+	return pins
+end
+
+-- Pins itemID to a position in whatever group it shows in, or unpins it when position is nil.
+function Window:Pin(itemID, position)
+	self:Pins()[itemID] = position
+	self.dirty = true
+	self:Refresh()
+end
+
+-- Pinned items take their position in the group, the first of each item ID only; a taken or
+-- out-of-range position falls to the next free one. Everything else fills the gaps in bag order.
+function Window:Arrange(buttons, itemOf)
+	local pins, count = self:Pins(), #buttons
+	local placed, rest, taken, pinned = {}, {}, {}, {}
+	for _, button in ipairs(buttons) do
+		local itemID = itemOf[button]
+		local position = itemID and not taken[itemID] and pins[itemID]
+		if position then
+			taken[itemID] = true
+			pinned[button] = true
+			position = math.min(position, count)
+			while placed[position] do position = position % count + 1 end
+			placed[position] = button
+		else
+			rest[#rest + 1] = button
+		end
+	end
+	local free = 1
+	for _, button in ipairs(rest) do
+		while placed[free] do free = free + 1 end
+		placed[free] = button
+	end
+	return placed, pinned
+end
+
 -- Sorts every slot into groups, in the window's order: an item in a category goes to that
 -- category's group, everything else (empty slots too) to its section's.
 function Window:Groups()
-	local byKey, used = {}, {}
+	local byKey, used, itemOf = {}, {}, {}
 	for _, category in ipairs(ns.Categories.List()) do
 		byKey[ns.Categories.Key(category.id)] = { label = category.name, category = category.id, buttons = {} }
 	end
@@ -269,7 +325,9 @@ function Window:Groups()
 			used[bag] = slots
 			for slot = 1, slots do
 				local button = self:Button(bag, slot)
-				local id = ns.Categories.Of(C_Container.GetContainerItemID(bag, slot))
+				local itemID = C_Container.GetContainerItemID(bag, slot)
+				itemOf[button] = itemID
+				local id = ns.Categories.Of(itemID)
 				local target = id and byKey[ns.Categories.Key(id)] or group
 				table.insert(target.buttons, button)
 			end
@@ -281,6 +339,7 @@ function Window:Groups()
 		local group = byKey[key]
 		if group and #group.buttons > 0 then
 			group.key = key
+			group.buttons, group.pinned = self:Arrange(group.buttons, itemOf)
 			groups[#groups + 1] = group
 			shownKeys[#shownKeys + 1] = key
 			hasCategories = hasCategories or group.category ~= nil
@@ -296,6 +355,7 @@ function Window:Layout()
 	local width = columns * step - SPACING
 	local groups, used, labelled = self:Groups()
 	local y, headerCount = 0, 0
+	self.positions = {}
 
 	for index, group in ipairs(groups) do
 		if index > 1 then y = y + SPACING + SECTION_GAP end
@@ -317,6 +377,8 @@ function Window:Layout()
 			button:ClearAllPoints()
 			button:SetPoint("TOPLEFT", self.content, "TOPLEFT", col * step, -(y + row * step))
 			button:Show(); button.decoration:Show()
+			self.positions[button] = n
+			SetPinned(button, group.pinned[button] == true)
 			self:UpdateButton(button)
 		end
 		y = y + math.ceil(#group.buttons / columns) * step - SPACING
