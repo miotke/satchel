@@ -15,9 +15,12 @@ local function obj(name)
     if k == "GetText" then return function(s) return s._text or "" end end
     if k == "SetSize" then return function(s, w, h) s._w, s._h = w, h end end
     if k == "SetAtlas" then return function() return true end end
+    if k == "GetFrameLevel" then return function() return 1 end end
     if k == "CreateTexture" or k == "CreateFontString" then return function() return obj() end end
     if k == "GetPoint" then return function() return "CENTER", nil, "CENTER", 1, 2 end end
-    if k == "Inset" or k == "CloseButton" then local i = obj(); rawset(t, k, i); return i end
+    if k == "Inset" or k == "CloseButton" or k == "ItemContextOverlay" then
+      local c = rawget(t, "_children"); c = c or {}; rawset(t, "_children", c); c[k] = c[k] or obj(); return c[k]
+    end
     return function() end
   end })
 end
@@ -111,7 +114,7 @@ ns.Categories.Delete(2); assert(#ns.db.categories == 1 and headers(bag) == "", h
 
 -- bank
 fire("BANKFRAME_OPENED"); assert(bankw:IsShown() and BankPanel:IsShown())
-local n = 0; for b, s in pairs(bankw.buttons) do for _, x in pairs(s) do if x:IsShown() then n = n + 1 end end end
+local n = 0; for b, s in pairs(bankw.buttons) do for _, x in pairs(s) do if x:IsShown() then n = n + 1; assert(x.decoration:IsShown()) end end end
 assert(n == 48, "bank slots " .. n)
 assert(bankw.freeText:GetText() == "6/48 free", bankw.freeText:GetText())
 items["8:3"] = 111; ns.Categories.Assign(111, 1); assert(headers(bankw) == "Healing,Bank", headers(bankw))
@@ -124,4 +127,10 @@ fire("BANKFRAME_CLOSED"); bankClosed = false; hooks.CloseSpecialWindows(); asser
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering")
 SlashCmdList.SATCHEL("reset"); SlashCmdList.SATCHEL("keyring"); SlashCmdList.SATCHEL("help")
+-- The clickable button must carry no add-on-written fields Blizzard's click reads.
+for _, w in ipairs(ns.windows) do for _, slots in pairs(w.buttons) do for _, b in pairs(slots) do
+  for k in pairs(b) do
+    assert(k:sub(1,1) == "_" or k == "decoration" or k == "satchelBag" or k == "satchelSlot", "clickable button field " .. k)
+  end
+end end end
 print("ok", created)

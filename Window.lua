@@ -58,46 +58,67 @@ local function OnItemClick(button, mouse)
 	if itemID then ns.Categories.ShowItemMenu(button, itemID) end
 end
 
+local function NewItemButton(name, holder, bag, slot)
+	local button = CreateFrame("ItemButton", name, holder, "ContainerFrameItemButtonTemplate")
+	button:SetSize(SLOT_SIZE, SLOT_SIZE)
+	button:SetID(slot)
+	-- Retail takes (bag, slot); Forever takes (container, bag, slot).
+	if button.Initialize then button:Initialize(holder, bag, slot) end
+	return button
+end
+
+-- Each slot is two of Blizzard's buttons. The one on top takes clicks, and Satchel never
+-- writes to it beyond Initialize and SetHasItem: the drawing calls set fields that its click
+-- handler reads, and a field written by add-on code taints the click, so Blizzard blocks
+-- using the item. The decoration underneath, which ignores the mouse, shows the item.
 function Window:Button(bag, slot)
 	local holder = self:Holder(bag)
 	local button = self.buttons[bag][slot]
 	if button then return button end
 
 	buttonCount = buttonCount + 1
-	button = CreateFrame("ItemButton", "SatchelItem" .. buttonCount, holder, "ContainerFrameItemButtonTemplate")
-	button:SetSize(SLOT_SIZE, SLOT_SIZE)
-	local background = button:CreateTexture(nil, "BACKGROUND", nil, -6)
+	local name = "SatchelItem" .. buttonCount
+	local decoration = NewItemButton(name .. "Decoration", holder, bag, slot)
+	decoration:EnableMouse(false)
+	local background = decoration:CreateTexture(nil, "BACKGROUND", nil, -6)
 	background:SetAllPoints()
 	if not background:SetAtlas(EMPTY_SLOT_ATLAS) then
 		background:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
 	end
-	button:SetID(slot)
-	-- Retail takes (bag, slot); Forever takes (container, bag, slot).
-	if button.Initialize then button:Initialize(holder, bag, slot) end
-	button.satchelBag, button.satchelSlot = bag, slot
+
+	button = NewItemButton(name, holder, bag, slot)
+	button:SetFrameLevel(decoration:GetFrameLevel() + 2)
+	decoration:SetAllPoints(button)
+	if button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
+	if button.ItemContextOverlay then button.ItemContextOverlay:SetAlpha(0) end
 	button:HookScript("OnClick", OnItemClick)
+
+	button.decoration = decoration
+	button.satchelBag, button.satchelSlot = bag, slot
 	self.buttons[bag][slot] = button
 	return button
 end
 
 function Window:UpdateButton(button)
 	local bag, slot = button.satchelBag, button.satchelSlot
+	local visual = button.decoration
 	local info = C_Container.GetContainerItemInfo(bag, slot)
 	local texture = info and info.iconFileID
-	SetItemButtonTexture(button, texture)
-	SetItemButtonCount(button, info and info.stackCount or 0)
-	SetItemButtonDesaturated(button, info and info.isLocked)
-	SetItemButtonQuality(button, info and info.quality, info and info.hyperlink, false, info and info.isBound)
 	if button.SetHasItem then button:SetHasItem(texture) end
-	if button.UpdateCooldown then button:UpdateCooldown(texture) end
-	if button.UpdateNewItem then button:UpdateNewItem(info and info.quality) end
-	if button.UpdateJunkItem then button:UpdateJunkItem(info and info.quality, info and info.hasNoValue) end
-	if button.UpdateQuestItem then
+
+	SetItemButtonTexture(visual, texture)
+	SetItemButtonCount(visual, info and info.stackCount or 0)
+	SetItemButtonDesaturated(visual, info and info.isLocked)
+	SetItemButtonQuality(visual, info and info.quality, info and info.hyperlink, false, info and info.isBound)
+	if visual.UpdateCooldown then visual:UpdateCooldown(texture) end
+	if visual.UpdateNewItem then visual:UpdateNewItem(info and info.quality) end
+	if visual.UpdateJunkItem then visual:UpdateJunkItem(info and info.quality, info and info.hasNoValue) end
+	if visual.UpdateQuestItem then
 		local quest = C_Container.GetContainerItemQuestInfo(bag, slot)
-		button:UpdateQuestItem(quest.isQuestItem, quest.questID, quest.isActive)
+		visual:UpdateQuestItem(quest.isQuestItem, quest.questID, quest.isActive)
 	end
-	if button.SetMatchesSearch then button:SetMatchesSearch(not (info and info.isFiltered)) end
-	button.readable = info and info.isReadable
+	if visual.SetMatchesSearch then visual:SetMatchesSearch(not (info and info.isFiltered)) end
+	if visual.SetReadable then visual:SetReadable(info and info.isReadable) end
 end
 
 -- Dropping an item on a category's header puts it there; on a section's header, takes it out.
@@ -209,7 +230,7 @@ function Window:Layout()
 			local col, row = (n - 1) % columns, math.floor((n - 1) / columns)
 			button:ClearAllPoints()
 			button:SetPoint("TOPLEFT", self.content, "TOPLEFT", col * step, -(y + row * step))
-			button:Show()
+			button:Show(); button.decoration:Show()
 			self:UpdateButton(button)
 		end
 		y = y + math.ceil(#group.buttons / columns) * step - SPACING
@@ -219,7 +240,7 @@ function Window:Layout()
 	-- Hide slots of bags that shrank, were removed or are switched off.
 	for bag, slots in pairs(self.buttons) do
 		for slot, button in pairs(slots) do
-			if slot > (used[bag] or 0) then button:Hide() end
+			if slot > (used[bag] or 0) then button:Hide(); button.decoration:Hide() end
 		end
 	end
 
