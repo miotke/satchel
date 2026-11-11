@@ -1,6 +1,6 @@
 # Satchel
 
-A unified bag window for World of Warcraft: Forever. The backpack and your four bags show as one grid, with the reagent bag and keyring as optional sections, with search, sort, free slots and gold.
+A unified bag window for World of Warcraft: Forever. The backpack and your four bags show as one grid, with the reagent bag and keyring as optional sections. The bank gets a window of its own.
 
 ## Install
 
@@ -8,17 +8,34 @@ Copy or symlink this folder into `World of Warcraft/_forever_/Interface/AddOns/S
 
 ## Use
 
-Open your bags as usual (B, the bag bar, vendors). Drag the title bar to move the window. The gear button has the same section options as the commands below.
+Open your bags as usual (B, the bag bar, vendors). The bank window opens when you talk to a banker. Drag a title bar to move a window. The gear button holds the section options and category management.
+
+### Categories
+
+Make your own categories, like "Tanking", and put items in them. A category is a section at the top of the backpack and bank. It shows only while one of its items is there, and everything else stays in the unified grid.
+
+- **Alt+right-click** an item to pick its category, make a new one, or take it out.
+- **Drag** an item onto a category's header to add it, or onto the Bags header to take it out.
+- Items belong to a category by item ID, so an item goes back to its category whenever it returns to your bags, for example after you unequip it.
+- Rename, reorder and delete categories in the gear menu under Categories.
+
+### Commands
 
 | Command | Does |
 | --- | --- |
-| `/satchel` | Toggle the window |
-| `/satchel cols <6-30>` | Slots per row (default 10) |
+| `/satchel` | Toggle the backpack |
+| `/satchel cols <6-30>` | Backpack slots per row (default 10) |
+| `/satchel bankcols <6-30>` | Bank slots per row (default 14) |
 | `/satchel scale <0.5-2>` | Window scale |
 | `/satchel reagent` | Show or hide the reagent bag (shown by default) |
 | `/satchel keyring` | Show or hide the keyring (hidden by default; the keyring button still shows it) |
-| `/satchel reset` | Move the window back to the bottom right |
+| `/satchel new <name>` | Make a category |
+| `/satchel reset` | Move the windows back to their default spots |
+
+## Develop
+
+`luajit tests/smoke.lua .` runs the add-on headless against stubbed WoW APIs. It catches logic errors, not how anything looks in the game.
 
 ## Not yet
 
-Bank, item categories, bag bar inside the window, Masque skins.
+Bank bag sockets (buy a tab or swap a bank bag in Blizzard's bank for now), Masque skins.
