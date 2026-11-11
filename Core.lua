@@ -24,6 +24,48 @@ ns.hidden:Hide()
 -- What /satchel perf reports.
 ns.stats = { layouts = 0, lastLayoutMs = 0, totalLayoutMs = 0, maxLayoutMs = 0, slotFrames = 0 }
 
+-- While the perf window is open, timings and memory samples also go to SatchelPerfLog, a
+-- SavedVariable WoW writes to disk on /reload or logout (read it with tools/perf-report.lua).
+-- Each list keeps only its newest entries, so the file stays small.
+local LOG_LIMIT = 2000
+ns.logging = false
+
+local function Append(list, entry)
+	list[#list + 1] = entry
+	if #list > LOG_LIMIT then table.remove(list, 1) end
+end
+
+function ns.StartLogging()
+	if ns.logging then return end
+	ns.logging = true
+	SatchelPerfLog = SatchelPerfLog or {}
+	local log = SatchelPerfLog
+	log.sessions, log.work, log.samples = log.sessions or {}, log.work or {}, log.samples or {}
+	Append(log.sessions, { started = time(), clock = GetTime(), build = (GetBuildInfo()) })
+end
+
+function ns.StopLogging()
+	ns.logging = false
+end
+
+-- kind is "layout", "update" or "cooldowns"; slots is how many slots the pass touched.
+function ns.RecordWork(kind, window, ms, slots)
+	if kind == "layout" then
+		local stats = ns.stats
+		stats.layouts = stats.layouts + 1
+		stats.lastLayoutMs = ms
+		stats.totalLayoutMs = stats.totalLayoutMs + ms
+		stats.maxLayoutMs = math.max(stats.maxLayoutMs, ms)
+	end
+	if ns.logging then
+		Append(SatchelPerfLog.work, { GetTime(), kind, window, ms, slots, InCombatLockdown() and 1 or 0 })
+	end
+end
+
+function ns.RecordMemory(kilobytes)
+	if ns.logging then Append(SatchelPerfLog.samples, { GetTime(), kilobytes }) end
+end
+
 function ns.Print(message)
 	print("|cffffd100Satchel|r: " .. message)
 end

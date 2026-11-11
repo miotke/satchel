@@ -1,6 +1,6 @@
 -- /satchel perf: a small window with Satchel's memory and redraw timings, refreshed every
 -- second while it is open. Reading add-on memory walks every loaded add-on, so it runs only
--- while this window shows.
+-- while this window shows; so does logging to SatchelPerfLog (Core.lua).
 
 local ADDON, ns = ...
 
@@ -12,6 +12,7 @@ local function Update()
 	local memory = GetAddOnMemoryUsage(ADDON)
 	local growth = lastMemory and memory - lastMemory or 0
 	lastMemory = memory
+	ns.RecordMemory(memory)
 	local stats = ns.stats
 	local average = stats.layouts > 0 and stats.totalLayoutMs / stats.layouts or 0
 	text:SetText(format(
@@ -23,7 +24,7 @@ local function Create()
 	frame = CreateFrame("Frame", "SatchelPerfFrame", UIParent, "ButtonFrameTemplate")
 	if ButtonFrameTemplate_HidePortrait then ButtonFrameTemplate_HidePortrait(frame) end
 	if ButtonFrameTemplate_HideButtonBar then ButtonFrameTemplate_HideButtonBar(frame) end
-	if frame.SetTitle then frame:SetTitle("Satchel performance") end
+	if frame.SetTitle then frame:SetTitle("Satchel perf (logging)") end
 	frame:SetSize(240, 130)
 	frame:SetFrameStrata("HIGH")
 	frame:SetClampedToScreen(true)
@@ -47,12 +48,14 @@ local function Create()
 
 	frame:SetScript("OnShow", function()
 		lastMemory = nil
+		ns.StartLogging()
 		Update()
 		ticker = C_Timer.NewTicker(1, Update)
 	end)
 	frame:SetScript("OnHide", function()
 		if ticker then ticker:Cancel() end
 		ticker = nil
+		ns.StopLogging()
 	end)
 	frame:Hide()
 	table.insert(UISpecialFrames, "SatchelPerfFrame")

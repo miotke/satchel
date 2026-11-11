@@ -36,7 +36,7 @@ slots = { [0]=16, 18, 18, 18, 18, 36, [-2]=12, [6]=28, [7]=0, [8]=20 }
 items = {}  -- "bag:slot" -> itemID
 infoCalls = 0
 clock = 0; debugprofilestop = function() clock = clock + 1; return clock end
-UpdateAddOnMemoryUsage = function() end; GetAddOnMemoryUsage = function() return 512 end; format = string.format
+UpdateAddOnMemoryUsage = function() end; time = os.time; GetTime = function() clock = clock + 1; return clock end; GetBuildInfo = function() return "1.60.1" end; GetAddOnMemoryUsage = function() return 512 end; format = string.format
 C_Container = {
   GetContainerNumSlots = function(b) return slots[b] or 0 end,
   GetContainerNumFreeSlots = function(b) return 3 end,
@@ -198,6 +198,21 @@ SlashCmdList.SATCHEL("perf"); local pf = SatchelPerfFrame; assert(pf:IsShown() a
 tickers[1].f(); local txt = ""; for _, r in ipairs(frames) do end
 SlashCmdList.SATCHEL("perf"); assert(not pf:IsShown() and tickers[1].cancelled, "ticker stops when hidden")
 SlashCmdList.SATCHEL("perf"); assert(#tickers == 2)
+-- logging while the perf window is open
+bag:Layout(); fire("BAG_UPDATE_COOLDOWN"); tickers[2].f(); tickers[2].f()
+assert(#SatchelPerfLog.sessions == 2 and #SatchelPerfLog.samples >= 3, "samples logged")
+local kinds = {}; for _, w in ipairs(SatchelPerfLog.work) do kinds[w[2]] = true end
+assert(kinds.layout and kinds.cooldowns, "work logged")
+SlashCmdList.SATCHEL("perf"); local n = #SatchelPerfLog.work; bag:Layout(); assert(#SatchelPerfLog.work == n, "no logging when closed")
+-- dump like WoW does, for tools/perf-report.lua
+local function dump(v, indent)
+  if type(v) ~= "table" then return type(v) == "string" and string.format("%q", v) or tostring(v) end
+  local out = {"{"}
+  for k, x in pairs(v) do out[#out+1] = indent .. "  [" .. dump(k, "") .. "] = " .. dump(x, indent .. "  ") .. "," end
+  out[#out+1] = indent .. "}"
+  return table.concat(out, "\n")
+end
+local f = io.open(os.getenv("SATCHEL_DUMP") or "/dev/null", "w"); f:write("SatchelPerfLog = " .. dump(SatchelPerfLog, "") .. "\n"); f:close()
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)

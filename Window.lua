@@ -363,10 +363,11 @@ function Window:Layout()
 	local step = SLOT_SIZE + SPACING
 	local width = columns * step - SPACING
 	local groups, used, labelled = self:Groups()
-	local y, headerCount = 0, 0
+	local y, headerCount, placed = 0, 0, 0
 	self.positions = {}
 
 	for index, group in ipairs(groups) do
+		placed = placed + #group.buttons
 		if index > 1 then y = y + SPACING + SECTION_GAP end
 		-- Headers only once a category shows, so a bag without categories stays one grid.
 		if labelled then
@@ -407,34 +408,38 @@ function Window:Layout()
 	self:UpdateFooter()
 	self.dirty = false
 	if start then
-		local stats = ns.stats
-		stats.layouts = stats.layouts + 1
-		stats.lastLayoutMs = debugprofilestop() - start
-		stats.totalLayoutMs = stats.totalLayoutMs + stats.lastLayoutMs
-		stats.maxLayoutMs = math.max(stats.maxLayoutMs, stats.lastLayoutMs)
-		stats.slotFrames = buttonCount * 2
+		ns.stats.slotFrames = buttonCount * 2
+		ns.RecordWork("layout", self.config.orderKey, debugprofilestop() - start, placed)
 	end
 end
 
 function Window:UpdateAll()
+	local start, count = debugprofilestop and debugprofilestop(), 0
 	for _, slots in pairs(self.buttons) do
 		for _, button in pairs(slots) do
-			if button:IsShown() then self:UpdateButton(button) end
+			if button:IsShown() then
+				self:UpdateButton(button)
+				count = count + 1
+			end
 		end
 	end
+	if start then ns.RecordWork("update", self.config.orderKey, debugprofilestop() - start, count) end
 end
 
 -- Cooldowns change far more often than anything else (BAG_UPDATE_COOLDOWN fires on many
 -- casts), so they skip reading item info: each slot keeps the icon it last drew.
 function Window:UpdateCooldowns()
+	local start, count = debugprofilestop and debugprofilestop(), 0
 	for _, slots in pairs(self.buttons) do
 		for _, button in pairs(slots) do
 			local visual = button.decoration
 			if visual.satchelTexture and button:IsShown() and visual.UpdateCooldown then
 				visual:UpdateCooldown(visual.satchelTexture)
+				count = count + 1
 			end
 		end
 	end
+	if start then ns.RecordWork("cooldowns", self.config.orderKey, debugprofilestop() - start, count) end
 end
 
 local WORK = { cooldowns = 1, update = 2, layout = 3 }

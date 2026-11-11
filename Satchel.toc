@@ -4,7 +4,7 @@
 ## Author: Andrew Miotke
 ## Version: 0.2.0
 ## Category: Inventory
-## SavedVariables: SatchelDB
+## SavedVariables: SatchelDB, SatchelPerfLog
 ## IconTexture: Interface\Icons\inv_misc_bag_08
 
 Core.lua
