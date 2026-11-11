@@ -11,21 +11,32 @@ local SPACING = 4
 local INSET_TOP, INSET_BOTTOM = 54, 28
 local PADDING = 8
 local EMPTY_SLOT_ATLAS = "bags-item-slot64"
-local DEFAULTS = { columns = 10, scale = 1 }
+local DEFAULTS = { columns = 10, scale = 1, showReagent = true, showKeyring = false }
 
 local db
 local frame, content, searchBox, moneyText, freeText
 local holders, buttons = {}, {}
 local buttonCount = 0
 local dirty = true
+-- The keyring button shows keys while the window is open, even with the keyring section off.
+local peekKeyring = false
 
--- Backpack, the four bag slots, then the reagent bag when one is equipped.
-local function BagIDs()
-	local ids = {}
-	for bag = 0, NUM_BAG_SLOTS or 4 do ids[#ids + 1] = bag end
-	local reagent = Enum.BagIndex and Enum.BagIndex.ReagentBag
-	if reagent and C_Container.GetContainerNumSlots(reagent) > 0 then ids[#ids + 1] = reagent end
-	return ids, reagent
+local REAGENT = Enum.BagIndex and Enum.BagIndex.ReagentBag
+local KEYRING = Enum.BagIndex and Enum.BagIndex.Keyring
+
+-- Each section starts on a row of its own: the backpack and bags, then the reagent bag and
+-- the keyring when they are shown and exist.
+local function Sections()
+	local bags = {}
+	for bag = 0, NUM_BAG_SLOTS or 4 do bags[#bags + 1] = bag end
+	local sections = { bags }
+	if REAGENT and db.showReagent and C_Container.GetContainerNumSlots(REAGENT) > 0 then
+		sections[#sections + 1] = { REAGENT }
+	end
+	if KEYRING and (db.showKeyring or peekKeyring) and C_Container.GetContainerNumSlots(KEYRING) > 0 then
+		sections[#sections + 1] = { KEYRING }
+	end
+	return sections
 end
 
 -- Blizzard's buttons find their bag through their parent, so each bag gets a holder frame
@@ -85,41 +96,48 @@ local function UpdateButton(button)
 end
 
 local function UpdateFooter()
+	-- Keyring slots hold only keys, so they are not free space.
 	local free, total = 0, 0
-	for _, bag in ipairs((BagIDs())) do
-		free = free + (C_Container.GetContainerNumFreeSlots(bag) or 0)
-		total = total + C_Container.GetContainerNumSlots(bag)
+	for _, section in ipairs(Sections()) do
+		for _, bag in ipairs(section) do
+			if bag ~= KEYRING then
+				free = free + (C_Container.GetContainerNumFreeSlots(bag) or 0)
+				total = total + C_Container.GetContainerNumSlots(bag)
+			end
+		end
 	end
 	freeText:SetFormattedText("%d/%d free", free, total)
 	moneyText:SetText(GetMoneyString(GetMoney(), true))
 end
 
--- Lays out every slot in one grid, the reagent bag on rows of its own, and sizes the window.
+-- Lays out every shown slot in one grid, each section on rows of its own, and sizes the window.
 local function Layout()
 	local columns = db.columns
 	local step = SLOT_SIZE + SPACING
 	local col, row, extra = 0, 0, 0
-	local bags, reagent = BagIDs()
 	local shown = {}
 
-	for _, bag in ipairs(bags) do
-		if bag == reagent and col > 0 then
-			col, row, extra = 0, row + 1, SPACING * 2
+	for index, section in ipairs(Sections()) do
+		if index > 1 then
+			if col > 0 then col, row = 0, row + 1 end
+			extra = extra + SPACING * 2
 		end
-		local slots = C_Container.GetContainerNumSlots(bag)
-		for slot = 1, slots do
-			local button = Button(bag, slot)
-			button:ClearAllPoints()
-			button:SetPoint("TOPLEFT", content, "TOPLEFT", col * step, -(row * step + extra))
-			button:Show()
-			UpdateButton(button)
-			col = col + 1
-			if col == columns then col, row = 0, row + 1 end
+		for _, bag in ipairs(section) do
+			local slots = C_Container.GetContainerNumSlots(bag)
+			for slot = 1, slots do
+				local button = Button(bag, slot)
+				button:ClearAllPoints()
+				button:SetPoint("TOPLEFT", content, "TOPLEFT", col * step, -(row * step + extra))
+				button:Show()
+				UpdateButton(button)
+				col = col + 1
+				if col == columns then col, row = 0, row + 1 end
+			end
+			shown[bag] = slots
 		end
-		shown[bag] = slots
 	end
 
-	-- Hide slots of bags that shrank or were removed.
+	-- Hide slots of bags that shrank, were removed or are switched off.
 	for bag, slots in pairs(buttons) do
 		local used = shown[bag] or 0
 		for slot, button in pairs(slots) do
@@ -146,6 +164,11 @@ end
 
 local function Refresh()
 	if frame:IsShown() then Layout() else dirty = true end
+end
+
+local function SetOption(key, value)
+	db[key] = value
+	Refresh()
 end
 
 local function SavePosition()
@@ -193,7 +216,7 @@ local function CreateWindow()
 	searchBox = CreateFrame("EditBox", "SatchelSearchBox", frame, "SearchBoxTemplate")
 	searchBox:SetHeight(20)
 	searchBox:SetPoint("TOPLEFT", 16, -28)
-	searchBox:SetPoint("TOPRIGHT", -68, -28)
+	searchBox:SetPoint("TOPRIGHT", -94, -28)
 	searchBox:HookScript("OnTextChanged", function(self)
 		C_Container.SetItemSearch(self:GetText())
 	end)
@@ -208,6 +231,27 @@ local function CreateWindow()
 		C_Container.SortBags()
 	end)
 
+	-- Retail's menu API; without it the slash commands still change these.
+	if MenuUtil and MenuUtil.CreateContextMenu then
+		local gear = CreateFrame("Button", nil, frame)
+		gear:SetSize(20, 20)
+		gear:SetPoint("LEFT", sort, "RIGHT", 4, 0)
+		gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+		gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+		gear:SetScript("OnClick", function(self)
+			MenuUtil.CreateContextMenu(self, function(_, root)
+				if REAGENT then
+					root:CreateCheckbox("Show reagent bag", function() return db.showReagent end,
+						function() SetOption("showReagent", not db.showReagent) end)
+				end
+				if KEYRING then
+					root:CreateCheckbox("Show keyring", function() return db.showKeyring end,
+						function() SetOption("showKeyring", not db.showKeyring) end)
+				end
+			end)
+		end)
+	end
+
 	freeText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	freeText:SetPoint("BOTTOMLEFT", 14, 9)
 	moneyText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -221,6 +265,7 @@ local function CreateWindow()
 		PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
 		searchBox:SetText("")
 		searchBox:ClearFocus()
+		if peekKeyring then peekKeyring = false; dirty = true end
 		if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end
 	end)
 
@@ -261,7 +306,7 @@ end
 local function IsCarriedBag(bag)
 	if bag == nil then return false end
 	if bag >= 0 and bag <= (NUM_BAG_SLOTS or 4) then return true end
-	return Enum.BagIndex and bag == Enum.BagIndex.ReagentBag
+	return bag == REAGENT
 end
 
 local function HookBagFunctions()
@@ -272,6 +317,15 @@ local function HookBagFunctions()
 	hooksecurefunc("OpenBackpack", function() Request("open") end)
 	hooksecurefunc("CloseBackpack", function() Request("close") end)
 	hooksecurefunc("ToggleBag", function(bag) if IsCarriedBag(bag) then Request("toggle") end end)
+	-- The keyring's own window is hidden with the others, so its button shows keys here.
+	if ToggleKeyRing and KEYRING then
+		hooksecurefunc("ToggleKeyRing", function()
+			if db.showKeyring then Request("toggle"); return end
+			peekKeyring = not (frame:IsShown() and peekKeyring)
+			if peekKeyring then Request("open") end
+			Refresh()
+		end)
+	end
 end
 
 local events = CreateFrame("Frame")
@@ -324,12 +378,18 @@ SlashCmdList.SATCHEL = function(input)
 	elseif command == "scale" and number then
 		db.scale = math.min(math.max(number, 0.5), 2)
 		frame:SetScale(db.scale)
+	elseif command == "reagent" then
+		SetOption("showReagent", not db.showReagent)
+		print("|cffffd100Satchel|r: reagent bag " .. (db.showReagent and "shown" or "hidden"))
+	elseif command == "keyring" then
+		SetOption("showKeyring", not db.showKeyring)
+		print("|cffffd100Satchel|r: keyring " .. (db.showKeyring and "shown" or "hidden"))
 	elseif command == "reset" then
 		db.position = nil
 		RestorePosition()
 	elseif command == "" then
 		frame:SetShown(not frame:IsShown())
 	else
-		print("|cffffd100Satchel|r: /satchel, /satchel cols <6-30>, /satchel scale <0.5-2>, /satchel reset")
+		print("|cffffd100Satchel|r: /satchel, /satchel cols <6-30>, /satchel scale <0.5-2>, /satchel reagent, /satchel keyring, /satchel reset")
 	end
 end
