@@ -263,6 +263,10 @@ local function ShowHeaderMenu(header)
 	local window, key, id = header.window, header.key, header.category
 	MenuUtil.CreateContextMenu(header, function(_, root)
 		root:CreateTitle(header.text:GetText())
+		if header.auto then
+			root:CreateButton("Turn off Quest Items", function() ns.SetOption("questCategory", false) end)
+			return
+		end
 		ns.Categories.AddMoveButtons(root, window, key)
 		if id then
 			root:CreateButton("Rename…", function() ns.Categories.PromptRename(id) end)
@@ -278,12 +282,17 @@ end
 local function OnHeaderEnter(header)
 	GameTooltip:SetOwner(header, "ANCHOR_TOP")
 	GameTooltip:SetText(header.text:GetText())
-	if header.category then
-		GameTooltip:AddLine("Drop an item here to add it. Alt+right-click an item for more.", 1, 1, 1, true)
+	if header.auto then
+		GameTooltip:AddLine("Quest items gather here on their own, always at the bottom.", 1, 1, 1, true)
+		GameTooltip:AddLine("Right-click to turn this section off.", 0.8, 0.8, 0.8, true)
 	else
-		GameTooltip:AddLine("Drop an item here to take it out of its category.", 1, 1, 1, true)
+		if header.category then
+			GameTooltip:AddLine("Drop an item here to add it. Alt+right-click an item for more.", 1, 1, 1, true)
+		else
+			GameTooltip:AddLine("Drop an item here to take it out of its category.", 1, 1, 1, true)
+		end
+		GameTooltip:AddLine("Right-click to move this section.", 0.8, 0.8, 0.8, true)
 	end
-	GameTooltip:AddLine("Right-click to move this section.", 0.8, 0.8, 0.8, true)
 	GameTooltip:Show()
 end
 
@@ -359,8 +368,26 @@ end
 
 -- Sorts every slot into groups, in the window's order: an item in a category goes to that
 -- category's group, everything else (empty slots too) to its section's.
+local QUEST_CLASS = Enum.ItemClass and Enum.ItemClass.Questitem or 12
+local QUEST_LABEL = "Quest Items"
+-- itemID -> whether it is a quest item. An item's quest status doesn't change, so each is
+-- looked up once per session.
+local questItems = {}
+
+local function IsQuestItem(itemID, bag, slot)
+	local known = questItems[itemID]
+	if known ~= nil then return known end
+	local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(itemID)
+	local quest = C_Container.GetContainerItemQuestInfo(bag, slot)
+	known = classID == QUEST_CLASS or quest.isQuestItem == true or quest.questID ~= nil
+	questItems[itemID] = known
+	return known
+end
+
 function Window:Groups()
 	local byKey, used, itemOf = {}, {}, {}
+	-- Quest items gather on their own at the bottom, unless the player put one in a category.
+	local quest = ns.db.questCategory and { label = QUEST_LABEL, auto = true, buttons = {} } or nil
 	for _, category in ipairs(ns.Categories.List()) do
 		byKey[ns.Categories.Key(category.id)] = { label = category.name, category = category.id, buttons = {} }
 	end
@@ -376,6 +403,7 @@ function Window:Groups()
 				itemOf[button] = itemID
 				local id = ns.Categories.Of(itemID)
 				local target = id and byKey[ns.Categories.Key(id)] or group
+				if not id and quest and itemID and IsQuestItem(itemID, bag, slot) then target = quest end
 				table.insert(target.buttons, button)
 			end
 		end
@@ -391,6 +419,12 @@ function Window:Groups()
 			shownKeys[#shownKeys + 1] = key
 			hasCategories = hasCategories or group.category ~= nil
 		end
+	end
+	-- Always last and never in the order, so moves step past nothing hidden down there.
+	if quest and #quest.buttons > 0 then
+		quest.buttons, quest.pinned = self:Arrange(quest.buttons, itemOf)
+		groups[#groups + 1] = quest
+		hasCategories = true
 	end
 	self.shownKeys = shownKeys
 	return groups, used, hasCategories
@@ -418,6 +452,7 @@ function Window:Layout()
 			header.text:SetText(group.label)
 			header.category = group.category
 			header.key = group.key
+			header.auto = group.auto
 			header:Show()
 			y = y + HEADER_HEIGHT
 		end

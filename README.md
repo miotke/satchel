@@ -17,6 +17,7 @@ Make your own categories, like "Tanking", and put items in them. A category is a
 - **Alt+right-click** an item to pick its category, make a new one, or take it out.
 - **Drag** an item onto a category's header to add it, or onto the Bags header to take it out.
 - Items belong to a category by item ID, so an item goes back to its category whenever it returns to your bags, for example after you unequip it.
+- **Quest Items** is a built-in section that gathers quest items on its own and always sits at the bottom. A category you put an item in wins over it. Turn it off in the gear menu or with `/satchel quest`.
 - **Right-click** any header to move that section up or down. Categories, Bags, Reagents and Keyring can go in any order, and the backpack and bank each keep their own.
 - Rename, move and delete categories in the gear menu under Categories, too.
 
@@ -37,6 +38,7 @@ Drag an item to the spot you want, then Alt+right-click it and choose **Pin to t
 | `/satchel bankcols <6-30>` | Bank slots per row (default 14) |
 | `/satchel scale <0.5-2>` | Window scale |
 | `/satchel reagent` | Show or hide the reagent bag (shown by default) |
+| `/satchel quest` | Turn the Quest Items section on or off (on by default) |
 | `/satchel keyring` | Show or hide the keyring (hidden by default; the keyring button still shows it) |
 | `/satchel new <name>` | Make a category |
 | `/satchel perf` | Toggle a small window with memory, growth per second and redraw timings |

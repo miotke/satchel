@@ -2,7 +2,7 @@
 local function obj(name)
   local o = { _shown = false, _name = name, _scripts = {}, _hooks = {}, _points = {} }
   return setmetatable(o, { __index = function(t, k)
-    if type(k) == "string" and k:sub(1, 7) == "satchel" then return nil end
+    if type(k) == "string" and k:sub(1, 1):match("%l") then return nil end
     if k == "IsShown" then return function(s) return s._shown end end
     if k == "Show" then return function(s) local was = s._shown; s._shown = true; if not was and s._scripts.OnShow then s._scripts.OnShow(s) end end end
     if k == "Hide" then return function(s) local was=s._shown; s._shown = false; if was and s._scripts.OnHide then s._scripts.OnHide(s) end end end
@@ -53,7 +53,9 @@ newCleared = 0; newItems = {}
 C_NewItems = { ClearAll = function() newCleared = newCleared + 1; newItems = {} end,
   IsNewItem = function(b, s) return newItems[b .. ":" .. s] == true end,
   RemoveNewItem = function(b, s) newItems[b .. ":" .. s] = nil end }
-C_Item = { GetItemNameByID = function() return "Shield" end }
+questIDs = {}  -- itemID -> true for quest items
+C_Item = { GetItemNameByID = function() return "Shield" end,
+  GetItemInfoInstant = function(id) return id, nil, nil, nil, nil, questIDs[id] and 12 or 4 end }
 local timers = {}
 C_Timer = { After = function(_, f) timers[#timers+1] = f end }
 hooks = {}
@@ -181,6 +183,22 @@ local b = bag.buttons[1][7]; altDown = true; b._hooks.OnClick(b, "RightButton");
 find(menus[#menus], "Unpin").a(); assert(bag:Pins()[333] == nil and not b.decoration.satchelPin:IsShown())
 -- the bank has its own pins
 assert(next(bankw:Pins()) == nil)
+
+-- quest items: their own section, always last; a player category wins; can be turned off
+questIDs[900] = true; questIDs[901] = true
+items["2:1"] = 900; items["3:3"] = 901; ns.Categories.Assign(901, 2); fire("BAG_UPDATE_DELAYED")
+assert(headers(bag) == "Healing,Gathering,Bags,Reagents,Quest Items" or headers(bag):match("Quest Items$"), headers(bag))
+assert(ns.Categories.Of(901) == 2, "player category kept")
+local qh; for _, h in ipairs(bag.headers) do if h:IsShown() and h.auto then qh = h end end
+assert(qh and bag.positions[bag.buttons[2][1]] == 1, "quest item in Quest Items")
+assert(not bag:CanMove("bags", 1) or bag.shownKeys[#bag.shownKeys] ~= nil)
+-- moving the last ordered section down can't pass Quest Items
+local last = bag.shownKeys[#bag.shownKeys]; assert(not bag:CanMove(last, 1), "nothing below the last section but quest")
+qh._scripts.OnClick(qh, "RightButton"); local qm = menus[#menus]
+assert(find(qm, "Turn off Quest Items") and not find(qm, "Move up"))
+find(qm, "Turn off Quest Items").a(); assert(ns.db.questCategory == false and not headers(bag):match("Quest"), headers(bag))
+SlashCmdList.SATCHEL("quest"); assert(ns.db.questCategory and headers(bag):match("Quest Items$"))
+items["2:1"] = nil; items["3:3"] = nil; ns.Categories.Assign(901, nil); fire("BAG_UPDATE_DELAYED")
 
 -- new-item glow: a looted item glows; hovering (the client clears the flag) stops it
 items["0:9"] = 777; newItems["0:9"] = true; fire("BAG_UPDATE_DELAYED")

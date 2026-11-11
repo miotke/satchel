@@ -12,6 +12,7 @@ local DEFAULTS = {
 	scale = 1,
 	showReagent = true,
 	showKeyring = false,
+	questCategory = true,
 }
 
 ns.REAGENT = Enum.BagIndex and Enum.BagIndex.ReagentBag

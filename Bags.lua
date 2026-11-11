@@ -25,12 +25,15 @@ local function SetOption(key, value)
 	ns.db[key] = value
 	ns.RefreshAll()
 end
+ns.SetOption = SetOption
 
 function ns.AddOptionsMenu(root)
 	if ns.REAGENT then
 		root:CreateCheckbox("Show reagent bag", function() return ns.db.showReagent end,
 			function() SetOption("showReagent", not ns.db.showReagent) end)
 	end
+	root:CreateCheckbox("Quest Items section", function() return ns.db.questCategory end,
+		function() SetOption("questCategory", not ns.db.questCategory) end)
 	if ns.KEYRING then
 		root:CreateCheckbox("Show keyring", function() return ns.db.showKeyring end,
 			function() SetOption("showKeyring", not ns.db.showKeyring) end)
@@ -143,6 +146,9 @@ SlashCmdList.SATCHEL = function(input)
 	elseif command == "reagent" then
 		SetOption("showReagent", not db.showReagent)
 		ns.Print("reagent bag " .. (db.showReagent and "shown" or "hidden"))
+	elseif command == "quest" then
+		SetOption("questCategory", not db.questCategory)
+		ns.Print("Quest Items section " .. (db.questCategory and "on" or "off"))
 	elseif command == "keyring" then
 		SetOption("showKeyring", not db.showKeyring)
 		ns.Print("keyring " .. (db.showKeyring and "shown" or "hidden"))
@@ -159,6 +165,6 @@ SlashCmdList.SATCHEL = function(input)
 		backpack:SetShown(not backpack:IsShown())
 	else
 		ns.Print("/satchel, /satchel cols <6-30>, /satchel bankcols <6-30>, /satchel scale <0.5-2>, "
-			.. "/satchel reagent, /satchel keyring, /satchel new <category>, /satchel perf, /satchel reset")
+			.. "/satchel reagent, /satchel keyring, /satchel quest, /satchel new <category>, /satchel perf, /satchel reset")
 	end
 end
