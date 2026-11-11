@@ -1,0 +1,5 @@
+# Perf logs and SavedVariables copies stay local.
+SavedVariables/
+Satchel.lua.bak
+*.perf.lua
+perf-*.txt
