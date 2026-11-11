@@ -18,7 +18,10 @@ jobs:
           fetch-depth: 0
       - name: Smoke test
         run: |
-          sudo apt-get install -y luajit
+          for attempt in 1 2 3; do
+            sudo apt-get update -q && sudo apt-get install -y -q luajit && break
+            sleep 10
+          done
           luajit tests/smoke.lua .
       - uses: BigWigsMods/packager@v2
         env:
