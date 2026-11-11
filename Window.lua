@@ -32,6 +32,7 @@ local buttonCount = 0
 	sectionKeys   every section key this window can show, in default order
 	sections      function returning { { key, label, bags = { bagIDs }, notFree = bool }, ... }
 	sort          function, or nil for no Sort button
+	extraButton   { icon, tooltip, onClick } for a small button left of Sort, or nil
 	close         function for the close button, or nil to just hide
 	bottomExtra   extra height above the footer for a window's own bar (the bank's tabs), or nil
 	masqueGroup   Masque group name for this window's slots
@@ -654,6 +655,22 @@ function Window:Build()
 		gear:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 		gear.window = self
 		gear:SetScript("OnClick", ShowOptionsMenu)
+		right = right - 24
+	end
+	if config.extraButton then
+		local extra = config.extraButton
+		local button = CreateFrame("Button", nil, frame)
+		button:SetSize(20, 20)
+		button:SetPoint("TOPRIGHT", right, -28)
+		button:SetNormalTexture(extra.icon)
+		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+		button:SetScript("OnClick", extra.onClick)
+		button:SetScript("OnEnter", function()
+			GameTooltip:SetOwner(button, "ANCHOR_TOP")
+			GameTooltip:SetText(extra.tooltip)
+			GameTooltip:Show()
+		end)
+		button:SetScript("OnLeave", GameTooltip_Hide)
 		right = right - 24
 	end
 	if config.sort then

@@ -10,9 +10,9 @@
 local _, ns = ...
 
 local bank
-local atBank = false
+ns.atBank = false
 
-local function BankBags()
+function ns.BankBags()
 	local bags = {}
 	for tab = 1, 20 do
 		local bag = Enum.BagIndex["CharacterBankTab_" .. tab]
@@ -23,7 +23,7 @@ local function BankBags()
 end
 
 local function Sections()
-	return { { key = "bank", label = "Bank", bags = BankBags() } }
+	return { { key = "bank", label = "Bank", bags = ns.BankBags() } }
 end
 
 local function CloseBank()
@@ -74,11 +74,29 @@ ns.On("PLAYER_LOGIN", function()
 
 	-- Escape hides the window through UISpecialFrames; leave banking mode with it.
 	hooksecurefunc("CloseSpecialWindows", function()
-		if atBank then CloseBank() end
+		if ns.atBank then CloseBank() end
+	end)
+
+	-- The saved copy (BankCache.lua): bank contents load a moment after the bank opens and
+	-- change while it is open, so copy once they are in and again after changes, at most
+	-- twice a second, and a last time as the bank closes.
+	local copyPending = false
+	local function SaveCopySoon()
+		if copyPending then return end
+		copyPending = true
+		C_Timer.After(0.5, function()
+			copyPending = false
+			if ns.atBank then ns.SaveBankCopy() end
+		end)
+	end
+	ns.On("BAG_UPDATE_DELAYED", function()
+		if ns.atBank then SaveCopySoon() end
 	end)
 
 	ns.On("BANKFRAME_OPENED", function()
-		atBank = true
+		ns.atBank = true
+		ns.HideBankCopy()
+		C_Timer.After(1.5, SaveCopySoon)
 		if BankPanel then
 			if BankPanel.SetBankType and Enum.BankType then BankPanel:SetBankType(Enum.BankType.Character) end
 			BankPanel:SetAlpha(0)
@@ -92,7 +110,8 @@ ns.On("PLAYER_LOGIN", function()
 	end)
 
 	ns.On("BANKFRAME_CLOSED", function()
-		atBank = false
+		if ns.atBank then ns.SaveBankCopy() end
+		ns.atBank = false
 		bank:SetShown(false)
 		if BankPanel then BankPanel:Hide() end
 		SilenceMoneyDisplay()
@@ -101,12 +120,12 @@ ns.On("PLAYER_LOGIN", function()
 	-- A tab bought, or a bag put in or taken out of a tab's socket.
 	for _, event in ipairs({ "PLAYERBANKSLOTS_CHANGED", "BANK_TABS_CHANGED", "BAG_CONTAINER_UPDATE" }) do
 		pcall(ns.On, event, function()
-			if not atBank then return end
+			if not ns.atBank then return end
 			bank:Refresh()
 			ns.UpdateBankTabs()
 		end)
 	end
 	ns.On("PLAYER_REGEN_ENABLED", function()
-		if atBank then ns.UpdateBankTabs() end
+		if ns.atBank then ns.UpdateBankTabs() end
 	end)
 end)

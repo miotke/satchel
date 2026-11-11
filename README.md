@@ -36,6 +36,10 @@ Below the bank's slots is a row of bank tabs. Each tab after the first holds one
 - **Drop a bag** on an empty tab, or click it while holding a bag, to add the bag's slots to your bank. **Drag** a bag off a tab to take it out, or drop another on it to swap.
 - The **plus** buys the next tab, through Blizzard's own purchase dialog. Hover it for the price.
 
+### Your bank, anywhere
+
+Each time you visit a banker, Satchel saves a copy of your bank for that character. Away from the bank, open it with the bag button next to Sort, or `/satchel bank`. It's read-only: hover for tooltips, shift-click to link, and search to find an item. The footer shows how old the copy is.
+
 ### Masque
 
 With [Masque](https://www.curseforge.com/wow/addons/masque) installed, pick a skin for Satchel's Backpack and Bank groups in Masque's options.
@@ -51,6 +55,7 @@ With [Masque](https://www.curseforge.com/wow/addons/masque) installed, pick a sk
 | `/satchel reagent` | Show or hide the reagent bag (shown by default) |
 | `/satchel quest` | Turn the Quest Items section on or off (on by default) |
 | `/satchel keyring` | Show or hide the keyring (hidden by default; the keyring button still shows it) |
+| `/satchel bank` | Show the saved copy of your bank |
 | `/satchel new <name>` | Make a category |
 | `/satchel perf` | Toggle a small window with memory, growth per second and redraw timings |
 | `/satchel reset` | Move the windows back to their default spots |

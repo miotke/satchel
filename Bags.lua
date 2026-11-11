@@ -106,6 +106,8 @@ ns.On("PLAYER_LOGIN", function()
 		sectionKeys = { "bags", "reagent", "keyring" },
 		sections = Sections,
 		sort = C_Container.SortBags,
+		extraButton = { icon = "Interface\\Icons\\INV_Misc_Bag_10_Blue", tooltip = "Bank (saved copy)",
+			onClick = function() ns.ToggleBankCopy() end },
 		onHide = function()
 			if peekKeyring then peekKeyring = false; backpack.dirty = true end
 			if C_NewItems and C_NewItems.ClearAll then C_NewItems.ClearAll() end
@@ -155,6 +157,8 @@ SlashCmdList.SATCHEL = function(input)
 		ns.Print("keyring " .. (db.showKeyring and "shown" or "hidden"))
 	elseif command == "new" and value then
 		if ns.Categories.Create(value) then ns.Print("added category " .. strtrim(value)) end
+	elseif command == "bank" then
+		ns.ToggleBankCopy()
 	elseif command == "perf" then
 		ns.TogglePerf()
 	elseif command == "reset" then
@@ -166,6 +170,6 @@ SlashCmdList.SATCHEL = function(input)
 		backpack:SetShown(not backpack:IsShown())
 	else
 		ns.Print("/satchel, /satchel cols <6-30>, /satchel bankcols <6-30>, /satchel scale <0.5-2>, "
-			.. "/satchel reagent, /satchel keyring, /satchel quest, /satchel new <category>, /satchel perf, /satchel reset")
+			.. "/satchel reagent, /satchel keyring, /satchel quest, /satchel bank, /satchel new <category>, /satchel perf, /satchel reset")
 	end
 end

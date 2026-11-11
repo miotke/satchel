@@ -2,7 +2,7 @@
 local function obj(name)
   local o = { _shown = false, _name = name, _scripts = {}, _hooks = {}, _points = {} }
   return setmetatable(o, { __index = function(t, k)
-    if type(k) == "string" and k:sub(1, 1):match("%l") then return nil end
+    if type(k) == "string" and k:sub(1, 1):match("[%l_]") then return nil end
     if k == "IsShown" then return function(s) return s._shown end end
     if k == "Show" then return function(s) local was = s._shown; s._shown = true; if not was and s._scripts.OnShow then s._scripts.OnShow(s) end end end
     if k == "Hide" then return function(s) local was=s._shown; s._shown = false; if was and s._scripts.OnHide then s._scripts.OnHide(s) end end end
@@ -11,6 +11,8 @@ local function obj(name)
     if k == "HookScript" then return function(s, n, f) s._hooks[n] = f end end
     if k == "SetPoint" then return function(s, ...) s._points[#s._points+1] = {...} end end
     if k == "ClearAllPoints" then return function(s) s._points = {} end end
+    if k == "SetAlpha" then return function(s, a) rawset(s, "_alpha", a) end end
+    if k == "GetAlpha" then return function(s) return rawget(s, "_alpha") or 1 end end
     if k == "SetText" then return function(s, v) s._text = v end end
     if k == "SetFormattedText" then return function(s, f, ...) s._text = f:format(...) end end
     if k == "GetText" then return function(s) return s._text or "" end end
@@ -55,7 +57,7 @@ C_Container = {
   GetContainerNumSlots = function(b) return slots[b] or 0 end,
   GetContainerNumFreeSlots = function(b) return 3 end,
   GetContainerItemID = function(b, s) return items[b..":"..s] end,
-  GetContainerItemInfo = function(b, s) infoCalls = infoCalls + 1; local id = items[b..":"..s]; if id then return { iconFileID = 1, stackCount = 1, quality = 3, hyperlink = "x" } end end,
+  GetContainerItemInfo = function(b, s) infoCalls = infoCalls + 1; local id = items[b..":"..s]; if id then return { itemID = id, iconFileID = 1, stackCount = 2, quality = 3, hyperlink = "|cff0070dd|Hitem:" .. id .. "|h[Item" .. id .. "]|h|r" } end end,
   GetContainerItemQuestInfo = function() return { isQuestItem = false } end,
   SetItemSearch = function() end, PickupContainerItem = function(b, s) picked[#picked+1] = b .. ":" .. s end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
 }
@@ -77,7 +79,9 @@ popups = {}
 StaticPopup_Show = function(name, a, b, data) popups[#popups+1] = { name = name, data = data } end
 StaticPopupDialogs = {}
 SOUNDKIT = {}; GetMoney = function() return 12345 end; GetMoneyString = function() return "1g" end
-UnitName = function() return "Me" end; InCombatLockdown = function() return false end
+UnitName = function() return "Me" end; GetRealmName = function() return "Realm" end
+ITEM_QUALITY_COLORS = { [3] = { r = 0, g = 0.4, b = 0.8 } }; HandleModifiedItemClick = function(link) linked = link end
+date = os.date; InCombatLockdown = function() return false end
 altDown = false; IsAltKeyDown = function() return altDown end
 cursor = nil; GetCursorInfo = function() if cursor then return "item", cursor end end; ClearCursor = function() cursor = nil end
 bankClosed = false
@@ -96,7 +100,7 @@ SlashCmdList = {}
 OKAY, CANCEL, DELETE, BANK = "Okay", "Cancel", "Delete", "Bank"
 
 local ns = {}
-for _, f in ipairs{"Core","Categories","Window","Bags","BankTabs","Bank","Perf"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
+for _, f in ipairs{"Core","Categories","Window","Bags","BankTabs","Bank","BankCache","Perf"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
 local events = frames[2]  -- frames[1] is ns.hidden
 local function flush() local t = timers; timers = {}; for _, f in ipairs(t) do f() end end
 local function fire(e, ...) events._scripts.OnEvent(events, e, ...); flush() end
@@ -187,6 +191,25 @@ fire("BANKFRAME_CLOSED"); assert(not bankw:IsShown() and not BankPanel:IsShown()
 -- escape path
 fire("BANKFRAME_OPENED"); bankClosed = false; hooks.CloseSpecialWindows(); assert(bankClosed)
 fire("BANKFRAME_CLOSED"); bankClosed = false; hooks.CloseSpecialWindows(); assert(not bankClosed, "no close away from bank")
+
+-- saved copy of the bank: written at the bank, read away from it
+local copy = SatchelDB.bankCache and SatchelDB.bankCache["Me-Realm"]
+assert(copy and #copy.slots == 48, "bank copy saved")
+local filled = 0; for _, e in ipairs(copy.slots) do if e then filled = filled + 1 end end
+assert(filled == 1 and copy.slots[31][1] == 111, "bank copy holds the item in tab 3 slot 3")
+SlashCmdList.SATCHEL("bank"); local cf = SatchelBankCopyFrame; assert(cf:IsShown(), "copy opens away from the bank")
+local box = SatchelBankCopySearchBox; box:SetText("item111"); box._hooks.OnTextChanged(box)
+local lit, dim = 0, 0
+for _, f in ipairs(frames) do if f._parent and f._parent._parent == cf and f._scripts.OnClick and f._scripts.OnEnter then
+  if f:GetAlpha() == 1 then lit = lit + 1 else dim = dim + 1 end end end
+assert(lit == 1 and dim == 47, "search lights " .. lit .. ", dims " .. dim)
+-- an early read with no bank slots yet never wipes the copy
+local keep = { slots[6], slots[8] }; slots[6], slots[8] = 0, 0
+ns.SaveBankCopy(); assert(SatchelDB.bankCache["Me-Realm"] == copy, "empty read kept out")
+slots[6], slots[8] = keep[1], keep[2]
+-- at a banker the copy closes and the slash command says the bank is open
+fire("BANKFRAME_OPENED"); assert(not cf:IsShown()); SlashCmdList.SATCHEL("bank"); assert(not cf:IsShown())
+fire("BANKFRAME_CLOSED")
 
 -- pins: item 333 sits at bag 4 slot 18 (position 88 of Bags); pin it to position 3
 for k in pairs(items) do items[k] = nil end

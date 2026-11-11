@@ -1,5 +1,9 @@
 # Satchel
 
+## Unreleased
+
+- **Your bank, anywhere.** Satchel saves a copy of your bank each time you visit a banker. Open it from the bag button next to Sort, or `/satchel bank`, to see and search your bank from anywhere.
+
 ## v0.3.0
 
 - **Bank tabs.** The bank window has a row of bank tabs. Drop a bag on a tab to add its slots, drag it off to take it out, and buy the next tab from the plus.
