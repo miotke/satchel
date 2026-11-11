@@ -10,6 +10,7 @@ local HEADER_HEIGHT = 18
 local SECTION_GAP = SPACING * 2
 local EMPTY_SLOT_ATLAS = "bags-item-slot64"
 local PIN_ATLAS = "Waypoint-MapPin-ChatIcon"
+local NEW_ITEM_ATLAS = "bags-glow-white"
 
 local Window = {}
 Window.__index = Window
@@ -66,6 +67,11 @@ local function OnItemClick(button, mouse)
 	if itemID then ns.Categories.ShowItemMenu(button, itemID, window, window.positions[button]) end
 end
 
+-- Hovering an item tells the client it was seen, which clears its flag; redraw the slot then.
+local function OnItemLeave(button)
+	button:GetParent().window:UpdateButton(button)
+end
+
 local function NewItemButton(name, holder, bag, slot)
 	local button = CreateFrame("ItemButton", name, holder, "ContainerFrameItemButtonTemplate")
 	button:SetSize(SLOT_SIZE, SLOT_SIZE)
@@ -103,6 +109,7 @@ function Window:Button(bag, slot)
 	if button.NewItemTexture then button.NewItemTexture:Hide() end
 	if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
 	button:HookScript("OnClick", OnItemClick)
+	button:HookScript("OnLeave", OnItemLeave)
 
 	button.decoration = decoration
 	button.satchelBag, button.satchelSlot = bag, slot
@@ -124,6 +131,38 @@ local function SetPinned(button, pinned)
 	decoration.satchelPin:SetShown(pinned)
 end
 
+-- The new-item glow, drawn by Satchel from the client's new-item flag: Blizzard's own glow
+-- does not show on the decoration on Forever. It pulses like Blizzard's.
+local function SetNewItem(visual, isNew, quality)
+	local glow = visual.satchelGlow
+	if not isNew then
+		if glow then
+			glow.pulse:Stop()
+			glow:Hide()
+		end
+		return
+	end
+	if not glow then
+		glow = visual:CreateTexture(nil, "OVERLAY", nil, 6)
+		glow:SetAllPoints()
+		glow:SetBlendMode("ADD")
+		local pulse = glow:CreateAnimationGroup()
+		pulse:SetLooping("BOUNCE")
+		local fade = pulse:CreateAnimation("Alpha")
+		fade:SetFromAlpha(1)
+		fade:SetToAlpha(0.3)
+		fade:SetDuration(0.8)
+		glow.pulse = pulse
+		visual.satchelGlow = glow
+	end
+	local atlas = quality and NEW_ITEM_ATLAS_BY_QUALITY and NEW_ITEM_ATLAS_BY_QUALITY[quality] or NEW_ITEM_ATLAS
+	if not glow:SetAtlas(atlas) and not glow:SetAtlas(NEW_ITEM_ATLAS) then
+		glow:SetColorTexture(1, 1, 1, 0.25)
+	end
+	glow:Show()
+	if not glow.pulse:IsPlaying() then glow.pulse:Play() end
+end
+
 function Window:UpdateButton(button)
 	local bag, slot = button.satchelBag, button.satchelSlot
 	local visual = button.decoration
@@ -137,7 +176,7 @@ function Window:UpdateButton(button)
 	SetItemButtonDesaturated(visual, info and info.isLocked)
 	SetItemButtonQuality(visual, info and info.quality, info and info.hyperlink, false, info and info.isBound)
 	if visual.UpdateCooldown then visual:UpdateCooldown(texture) end
-	if visual.UpdateNewItem then visual:UpdateNewItem(info and info.quality) end
+	SetNewItem(visual, info and C_NewItems and C_NewItems.IsNewItem(bag, slot), info and info.quality)
 	if visual.UpdateJunkItem then visual:UpdateJunkItem(info and info.quality, info and info.hasNoValue) end
 	if visual.UpdateQuestItem then
 		if info then
