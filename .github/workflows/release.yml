@@ -10,18 +10,22 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    # Homebrew's LuaJIT, as used locally.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install luajit
+      - name: Smoke test
+        run: luajit tests/smoke.lua .
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # Built from source fetched from GitHub; the runner's Ubuntu mirrors can be unreachable.
-      - uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "luajit-2.1.0-beta3"
-      - name: Smoke test
-        run: lua tests/smoke.lua .
       - uses: BigWigsMods/packager@v2
         env:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
