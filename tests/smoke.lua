@@ -17,6 +17,10 @@ local function obj(name)
     if k == "SetSize" then return function(s, w, h) s._w, s._h = w, h end end
     if k == "SetAtlas" then return function() return true end end
     if k == "GetParent" then return function(s) return rawget(s, "_parent") end end
+    if k == "CreateAnimationGroup" or k == "CreateAnimation" then return function() return obj() end end
+    if k == "Play" then return function(s) rawset(s, "_playing", true) end end
+    if k == "Stop" then return function(s) rawset(s, "_playing", false) end end
+    if k == "IsPlaying" then return function(s) return rawget(s, "_playing") == true end end
     if k == "GetFrameLevel" then return function() return 1 end end
     if k == "CreateTexture" or k == "CreateFontString" then return function() return obj() end end
     if k == "GetPoint" then return function() return "CENTER", nil, "CENTER", 1, 2 end end
@@ -45,7 +49,10 @@ C_Container = {
   GetContainerItemQuestInfo = function() return { isQuestItem = false } end,
   SetItemSearch = function() end, SortBags = function() end, SortBankBags = function() sortedBank = true end,
 }
-newCleared = 0; C_NewItems = { ClearAll = function() newCleared = newCleared + 1 end }
+newCleared = 0; newItems = {}
+C_NewItems = { ClearAll = function() newCleared = newCleared + 1; newItems = {} end,
+  IsNewItem = function(b, s) return newItems[b .. ":" .. s] == true end,
+  RemoveNewItem = function(b, s) newItems[b .. ":" .. s] = nil end }
 C_Item = { GetItemNameByID = function() return "Shield" end }
 local timers = {}
 C_Timer = { After = function(_, f) timers[#timers+1] = f end }
@@ -175,6 +182,16 @@ find(menus[#menus], "Unpin").a(); assert(bag:Pins()[333] == nil and not b.decora
 -- the bank has its own pins
 assert(next(bankw:Pins()) == nil)
 
+-- new-item glow: a looted item glows; hovering (the client clears the flag) stops it
+items["0:9"] = 777; newItems["0:9"] = true; fire("BAG_UPDATE_DELAYED")
+local nb = bag.buttons[0][9]
+assert(nb.decoration.satchelGlow:IsShown() and nb.decoration.satchelGlow.pulse:IsPlaying(), "new item glows")
+assert(not (bag.buttons[0][1].decoration.satchelGlow and bag.buttons[0][1].decoration.satchelGlow:IsShown()), "old item doesn't")
+C_NewItems.RemoveNewItem(0, 9); nb._hooks.OnLeave(nb)
+assert(not nb.decoration.satchelGlow:IsShown(), "hover clears glow")
+newItems["0:9"] = true; fire("BAG_UPDATE_DELAYED"); bag:SetShown(false); bag:SetShown(true)
+assert(not nb.decoration.satchelGlow:IsShown(), "closing the bag clears glow")
+
 -- performance: a cooldown reads no item info; a burst of events is one layout
 infoCalls = 0; fire("BAG_UPDATE_COOLDOWN"); assert(infoCalls == 0, "cooldown read item info " .. infoCalls)
 local layouts = ns.stats.layouts
@@ -198,21 +215,8 @@ SlashCmdList.SATCHEL("perf"); local pf = SatchelPerfFrame; assert(pf:IsShown() a
 tickers[1].f(); local txt = ""; for _, r in ipairs(frames) do end
 SlashCmdList.SATCHEL("perf"); assert(not pf:IsShown() and tickers[1].cancelled, "ticker stops when hidden")
 SlashCmdList.SATCHEL("perf"); assert(#tickers == 2)
--- logging while the perf window is open
-bag:Layout(); fire("BAG_UPDATE_COOLDOWN"); tickers[2].f(); tickers[2].f()
-assert(#SatchelPerfLog.sessions == 2 and #SatchelPerfLog.samples >= 3, "samples logged")
-local kinds = {}; for _, w in ipairs(SatchelPerfLog.work) do kinds[w[2]] = true end
-assert(kinds.layout and kinds.cooldowns, "work logged")
-SlashCmdList.SATCHEL("perf"); local n = #SatchelPerfLog.work; bag:Layout(); assert(#SatchelPerfLog.work == n, "no logging when closed")
--- dump like WoW does, for tools/perf-report.lua
-local function dump(v, indent)
-  if type(v) ~= "table" then return type(v) == "string" and string.format("%q", v) or tostring(v) end
-  local out = {"{"}
-  for k, x in pairs(v) do out[#out+1] = indent .. "  [" .. dump(k, "") .. "] = " .. dump(x, indent .. "  ") .. "," end
-  out[#out+1] = indent .. "}"
-  return table.concat(out, "\n")
-end
-local f = io.open(os.getenv("SATCHEL_DUMP") or "/dev/null", "w"); f:write("SatchelPerfLog = " .. dump(SatchelPerfLog, "") .. "\n"); f:close()
+-- the perf window keeps everything in memory: nothing is saved
+assert(SatchelDB.perfLog == nil and SatchelPerfLog == nil, "no saved logs")
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)

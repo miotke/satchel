@@ -48,12 +48,6 @@ Push a tag like `v0.2.1` to release: the Release workflow runs the smoke test, t
 
 `luajit tests/smoke.lua .` runs the add-on headless against stubbed WoW APIs. It catches logic errors, not how anything looks in the game.
 
-While the `/satchel perf` window is open, Satchel logs memory every second and the time of every redraw to the `SatchelPerfLog` SavedVariable (newest 2,000 entries of each). WoW writes it on `/reload` or logout. Summarise it with:
-
-```
-luajit tools/perf-report.lua "World of Warcraft/_forever_/WTF/Account/<ACCOUNT>/SavedVariables/Satchel.lua"
-```
-
 ## Not yet
 
 Bank bag sockets (buy a tab or swap a bank bag in Blizzard's bank for now), Masque skins.
