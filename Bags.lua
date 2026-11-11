@@ -149,10 +149,7 @@ SlashCmdList.SATCHEL = function(input)
 	elseif command == "new" and value then
 		if ns.Categories.Create(value) then ns.Print("added category " .. strtrim(value)) end
 	elseif command == "perf" then
-		UpdateAddOnMemoryUsage()
-		local stats = ns.stats
-		ns.Print(format("%.0f KB memory, %d slot frames, last layout %.2f ms (%d so far)",
-			GetAddOnMemoryUsage("Satchel"), stats.slotFrames, stats.lastLayoutMs, stats.layouts))
+		ns.TogglePerf()
 	elseif command == "reset" then
 		for _, window in ipairs(ns.windows) do
 			db[window.config.positionKey] = nil

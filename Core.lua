@@ -22,7 +22,7 @@ ns.hidden = CreateFrame("Frame")
 ns.hidden:Hide()
 
 -- What /satchel perf reports.
-ns.stats = { layouts = 0, lastLayoutMs = 0, slotFrames = 0 }
+ns.stats = { layouts = 0, lastLayoutMs = 0, totalLayoutMs = 0, maxLayoutMs = 0, slotFrames = 0 }
 
 function ns.Print(message)
 	print("|cffffd100Satchel|r: " .. message)

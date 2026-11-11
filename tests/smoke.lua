@@ -75,7 +75,7 @@ SlashCmdList = {}
 OKAY, CANCEL, DELETE, BANK = "Okay", "Cancel", "Delete", "Bank"
 
 local ns = {}
-for _, f in ipairs{"Core","Categories","Window","Bags","Bank"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
+for _, f in ipairs{"Core","Categories","Window","Bags","Bank","Perf"} do assert(loadfile(arg[1].."/"..f..".lua"))("Satchel", ns) end
 local events = frames[2]  -- frames[1] is ns.hidden
 local function flush() local t = timers; timers = {}; for _, f in ipairs(t) do f() end end
 local function fire(e, ...) events._scripts.OnEvent(events, e, ...); flush() end
@@ -192,7 +192,12 @@ C_Container.GetContainerItemQuestInfo = function(...) questCalls = questCalls + 
 fire("INVENTORY_SEARCH_UPDATE"); C_Container.GetContainerItemQuestInfo = q
 local filled = 0; for _ in pairs(items) do filled = filled + 1 end
 assert(questCalls <= filled, "quest lookups " .. questCalls)
-SlashCmdList.SATCHEL("perf")
+tickers = {}; C_Timer.NewTicker = function(_, f) local t = { f = f, Cancel = function(self) self.cancelled = true end }; tickers[#tickers+1] = t; return t end
+local mem = 500; GetAddOnMemoryUsage = function() mem = mem + 2; return mem end
+SlashCmdList.SATCHEL("perf"); local pf = SatchelPerfFrame; assert(pf:IsShown() and #tickers == 1)
+tickers[1].f(); local txt = ""; for _, r in ipairs(frames) do end
+SlashCmdList.SATCHEL("perf"); assert(not pf:IsShown() and tickers[1].cancelled, "ticker stops when hidden")
+SlashCmdList.SATCHEL("perf"); assert(#tickers == 2)
 
 SlashCmdList.SATCHEL("bankcols 8"); assert(ns.db.bankColumns == 8)
 SlashCmdList.SATCHEL("new Gathering"); assert(ns.db.categories[2].name == "Gathering" and ns.db.categories[2].id == 3)

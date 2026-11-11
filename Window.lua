@@ -410,6 +410,8 @@ function Window:Layout()
 		local stats = ns.stats
 		stats.layouts = stats.layouts + 1
 		stats.lastLayoutMs = debugprofilestop() - start
+		stats.totalLayoutMs = stats.totalLayoutMs + stats.lastLayoutMs
+		stats.maxLayoutMs = math.max(stats.maxLayoutMs, stats.lastLayoutMs)
 		stats.slotFrames = buttonCount * 2
 	end
 end

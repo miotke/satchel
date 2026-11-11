@@ -12,3 +12,4 @@ Categories.lua
 Window.lua
 Bags.lua
 Bank.lua
+Perf.lua
