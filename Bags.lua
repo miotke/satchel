@@ -128,6 +128,30 @@ ns.On("PLAYER_LOGIN", function()
 	HookBagFunctions()
 end)
 
+-- /satchel inspect: every visible texture on the slot under the mouse, on both the click
+-- layer and the decoration, so a stray texture in game can be named exactly.
+local function DescribeRegions(label, frame)
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsVisible() and region:GetAlpha() > 0 and region.GetTexture then
+			local key = region:GetDebugName():match("[^%.]+$") or "?"
+			local art = (region.GetAtlas and region:GetAtlas()) or region:GetTexture() or "color"
+			print(format("  %s %s  %s  layer %s  alpha %.2f", label, key, tostring(art), region:GetDrawLayer(), region:GetAlpha()))
+		end
+	end
+end
+
+local function Inspect()
+	local focus = GetMouseFoci and GetMouseFoci()[1] or GetMouseFocus and GetMouseFocus()
+	if not (focus and focus.decoration) then
+		ns.Print("hover a bag slot, then type /satchel inspect")
+		return
+	end
+	ns.Print(format("bag %d slot %d, new %s", focus.satchelBag, focus.satchelSlot,
+		tostring(C_NewItems.IsNewItem(focus.satchelBag, focus.satchelSlot))))
+	DescribeRegions("click", focus)
+	DescribeRegions("decoration", focus.decoration)
+end
+
 SLASH_SATCHEL1 = "/satchel"
 SlashCmdList.SATCHEL = function(input)
 	local command, value = strsplit(" ", strtrim(input or ""), 2)
@@ -154,6 +178,8 @@ SlashCmdList.SATCHEL = function(input)
 		ns.Print("keyring " .. (db.showKeyring and "shown" or "hidden"))
 	elseif command == "new" and value then
 		if ns.Categories.Create(value) then ns.Print("added category " .. strtrim(value)) end
+	elseif command == "inspect" then
+		Inspect()
 	elseif command == "perf" then
 		ns.TogglePerf()
 	elseif command == "reset" then
