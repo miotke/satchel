@@ -1,6 +1,6 @@
 # Satchel
 
-## Unreleased
+## v0.3.2
 
 - Talking to a banker opens your bags too, and closes them again when you leave if they weren't already open.
 
