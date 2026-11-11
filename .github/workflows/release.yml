@@ -1,0 +1,25 @@
+name: Release
+
+# Pushing a tag like v0.2.0 tests the add-on, then the BigWigs packager builds
+# Satchel-v0.2.0.zip and release.json and publishes them as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Smoke test
+        run: |
+          sudo apt-get install -y luajit
+          luajit tests/smoke.lua .
+      - uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

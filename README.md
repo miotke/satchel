@@ -4,7 +4,7 @@ A unified bag window for World of Warcraft: Forever. The backpack and your four 
 
 ## Install
 
-Copy or symlink this folder into `World of Warcraft/_forever_/Interface/AddOns/Satchel`.
+Install it with an add-on manager that reads GitHub releases, or download the zip from [Releases](https://github.com/miotke/satchel/releases) and unzip it. For development, copy or symlink this folder into `World of Warcraft/_forever_/Interface/AddOns/Satchel`.
 
 ## Use
 
@@ -43,6 +43,8 @@ Drag an item to the spot you want, then Alt+right-click it and choose **Pin to t
 | `/satchel reset` | Move the windows back to their default spots |
 
 ## Develop
+
+Push a tag like `v0.2.1` to release: the Release workflow runs the smoke test, then the BigWigs packager publishes `Satchel-v0.2.1.zip` and `release.json` on GitHub.
 
 `luajit tests/smoke.lua .` runs the add-on headless against stubbed WoW APIs. It catches logic errors, not how anything looks in the game.
 

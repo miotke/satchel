@@ -1,0 +1,6 @@
+package-as: Satchel
+
+ignore:
+  - tests
+  - tools
+  - .gitignore

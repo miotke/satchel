@@ -2,7 +2,7 @@
 ## Title: Satchel
 ## Notes: All your bags in one window, your bank in another, with categories you make.
 ## Author: Andrew Miotke
-## Version: 0.2.0
+## Version: @project-version@
 ## Category: Inventory
 ## SavedVariables: SatchelDB, SatchelPerfLog
 ## IconTexture: Interface\Icons\inv_misc_bag_08
