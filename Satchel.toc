@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: Satchel
+## Notes: All your bags in one window.
+## Author: Andrew Miotke
+## Version: 0.1.0
+## Category: Inventory
+## SavedVariables: SatchelDB
+## IconTexture: Interface\Icons\inv_misc_bag_08
+
+Satchel.lua
