@@ -83,7 +83,7 @@ end
 
 local function FinishSwap(button)
 	local held, target = pendingSwap.held, pendingSwap.target
-	if pendingSwap.button ~= button or not held or not target or held == target then return end
+	if not ns.db.swapCategories or pendingSwap.button ~= button or not held or not target or held == target then return end
 	pendingSwap.held = nil
 	-- Still holding it: the drop didn't happen.
 	local kind, now = GetCursorInfo()

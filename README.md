@@ -20,6 +20,7 @@ Make your own categories, like "Tanking", and put items in them. A category is a
 - **Quest Items** is a built-in section that gathers quest items on its own and always sits at the bottom. A category you put an item in wins over it. Turn it off in the gear menu or with `/satchel quest`.
 - **Right-click** any header to move that section up or down. Categories, Bags, Reagents and Keyring can go in any order, and the backpack and bank each keep their own.
 - Rename, move and delete categories in the gear menu under Categories, too.
+- Drop an item onto one in a category and the two swap categories as well as places. Turn this off in the gear menu with **Swapped items swap categories**.
 
 ### Pinned slots
 

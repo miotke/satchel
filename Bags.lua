@@ -34,6 +34,8 @@ function ns.AddOptionsMenu(root)
 	end
 	root:CreateCheckbox("Quest Items section", function() return ns.db.questCategory end,
 		function() SetOption("questCategory", not ns.db.questCategory) end)
+	root:CreateCheckbox("Swapped items swap categories", function() return ns.db.swapCategories end,
+		function() SetOption("swapCategories", not ns.db.swapCategories) end)
 	if ns.KEYRING then
 		root:CreateCheckbox("Show keyring", function() return ns.db.showKeyring end,
 			function() SetOption("showKeyring", not ns.db.showKeyring) end)

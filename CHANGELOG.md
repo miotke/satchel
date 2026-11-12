@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Swapping two items now swaps their categories too. Drop an item from Bags onto one in Tanking and the new one joins Tanking, while the old one goes back to Bags.
+- Swapping two items now swaps their categories too. Drop an item from Bags onto one in Tanking and the new one joins Tanking, while the old one goes back to Bags. Turn it off in the gear menu.
 
 ## v0.3.2
 

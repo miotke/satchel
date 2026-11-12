@@ -160,6 +160,11 @@ cursor = 111; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); cursor = nil; t
 assert(ns.Categories.Of(111) == nil and ns.Categories.Of(222) == 1, "same-slot target read on the way in: 111 over 111 is no swap")
 items["3:1"] = 222; cursor = 111; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); cursor = nil; tankBtn._hooks.OnClick(tankBtn, "LeftButton")
 assert(ns.Categories.Of(111) == 1 and ns.Categories.Of(222) == nil, "click swaps back")
+-- switched off, a swap leaves categories alone
+ns.db.swapCategories = false
+items["3:1"] = 222; cursor = 111; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); cursor = nil; tankBtn._hooks.OnClick(tankBtn, "LeftButton")
+assert(ns.Categories.Of(111) == 1 and ns.Categories.Of(222) == nil, "option off")
+ns.db.swapCategories = true
 -- a drop that didn't happen leaves both alone
 cursor = 222; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); tankBtn._hooks.OnClick(tankBtn, "LeftButton"); cursor = nil
 assert(ns.Categories.Of(111) == 1 and ns.Categories.Of(222) == nil)
