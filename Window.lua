@@ -74,6 +74,7 @@ end
 local pendingSwap = {}
 
 local function NoteSwap(button)
+	if not ns.db.swapCategories then return end
 	local kind, held = GetCursorInfo()
 	local target = C_Container.GetContainerItemID(button.satchelBag, button.satchelSlot)
 	pendingSwap.button = button
