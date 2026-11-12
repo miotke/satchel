@@ -152,6 +152,18 @@ bag:Move("category:1", -1); bag:Move("category:1", -1); assert(headers(bag) == "
 assert(ns.db.order.bank == nil or ns.db.order.bank[1] ~= "bags")
 -- drop on Bags header removes
 cursor = 222; bag.headers[2]._scripts.OnReceiveDrag(bag.headers[2]); assert(ns.Categories.Of(222) == nil)
+-- a Bags item dropped on a Tanking one trades places and categories, by drag or by click
+local tankBtn = bag.buttons[3][1]
+cursor = 222; tankBtn._hooks.OnEnter(tankBtn); cursor = nil; tankBtn._hooks.OnReceiveDrag(tankBtn)
+assert(ns.Categories.Of(222) == 1 and ns.Categories.Of(111) == nil, "drag swaps categories")
+cursor = 111; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); cursor = nil; tankBtn._hooks.OnClick(tankBtn, "LeftButton")
+assert(ns.Categories.Of(111) == nil and ns.Categories.Of(222) == 1, "same-slot target read on the way in: 111 over 111 is no swap")
+items["3:1"] = 222; cursor = 111; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); cursor = nil; tankBtn._hooks.OnClick(tankBtn, "LeftButton")
+assert(ns.Categories.Of(111) == 1 and ns.Categories.Of(222) == nil, "click swaps back")
+-- a drop that didn't happen leaves both alone
+cursor = 222; tankBtn._hooks.OnMouseDown(tankBtn, "LeftButton"); tankBtn._hooks.OnClick(tankBtn, "LeftButton"); cursor = nil
+assert(ns.Categories.Of(111) == 1 and ns.Categories.Of(222) == nil)
+items["3:1"] = 111
 -- duplicate name refused, rename, move, delete
 assert(ns.Categories.Create("tanking") == nil)
 assert(ns.Categories.Create("Healing") == 2)

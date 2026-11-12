@@ -67,7 +67,36 @@ function Window:Holder(bag)
 	return holder
 end
 
+-- Putting an item onto another one swaps them, and the two trade categories too: drop a Bags
+-- item on a Tanking one and the new one is Tanking now. Blizzard's handler runs before these
+-- hooks and changes the cursor, so what was held over which item is noted on the way in (a
+-- drag enters the slot, a click presses it) and acted on after the drop.
+local pendingSwap = {}
+
+local function NoteSwap(button)
+	local kind, held = GetCursorInfo()
+	local target = C_Container.GetContainerItemID(button.satchelBag, button.satchelSlot)
+	pendingSwap.button = button
+	pendingSwap.held = kind == "item" and held or nil
+	pendingSwap.target = target
+end
+
+local function FinishSwap(button)
+	local held, target = pendingSwap.held, pendingSwap.target
+	if pendingSwap.button ~= button or not held or not target or held == target then return end
+	pendingSwap.held = nil
+	-- Still holding it: the drop didn't happen.
+	local kind, now = GetCursorInfo()
+	if kind == "item" and now == held then return end
+	ns.Categories.Swap(held, target)
+end
+
+local function OnItemMouseDown(button, mouse)
+	if mouse == "LeftButton" then NoteSwap(button) end
+end
+
 local function OnItemClick(button, mouse)
+	if mouse == "LeftButton" then FinishSwap(button) end
 	-- Alt+right-click does nothing in Blizzard's handler, which runs first.
 	if mouse ~= "RightButton" or not IsAltKeyDown() then return end
 	local itemID = C_Container.GetContainerItemID(button.satchelBag, button.satchelSlot)
@@ -77,6 +106,7 @@ end
 
 -- Hovering a new item marks it seen, which ends its glow.
 local function OnItemEnter(button)
+	NoteSwap(button)
 	local bag, slot = button.satchelBag, button.satchelSlot
 	if C_NewItems and C_NewItems.IsNewItem(bag, slot) then
 		C_NewItems.RemoveNewItem(bag, slot)
@@ -136,6 +166,8 @@ function Window:Button(bag, slot)
 	SilenceBlizzardGlows(button)
 	button:HookScript("OnClick", OnItemClick)
 	button:HookScript("OnEnter", OnItemEnter)
+	button:HookScript("OnMouseDown", OnItemMouseDown)
+	button:HookScript("OnReceiveDrag", FinishSwap)
 
 	button.decoration = decoration
 	if self.masque then self.masque:AddButton(decoration) end

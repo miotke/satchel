@@ -1,5 +1,9 @@
 # Satchel
 
+## Unreleased
+
+- Swapping two items now swaps their categories too. Drop an item from Bags onto one in Tanking and the new one joins Tanking, while the old one goes back to Bags.
+
 ## v0.3.2
 
 - Talking to a banker opens your bags too, and closes them again when you leave if they weren't already open.

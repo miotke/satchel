@@ -47,6 +47,19 @@ function Categories.Assign(itemID, id)
 	ns.RefreshAll()
 end
 
+-- Two items trade categories; either may have none.
+function Categories.Swap(firstID, secondID)
+	local first, second = Categories.Of(firstID), Categories.Of(secondID)
+	if first == second then return end
+	for _, category in ipairs(ns.db.categories) do
+		category.items[firstID], category.items[secondID] = nil, nil
+	end
+	if second then Categories.Get(second).items[firstID] = true end
+	if first then Categories.Get(first).items[secondID] = true end
+	itemIndex = nil
+	ns.RefreshAll()
+end
+
 local function CleanName(name)
 	name = strtrim(name or "")
 	if name == "" then return nil end
